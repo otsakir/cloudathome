@@ -29,7 +29,8 @@ RUN ssh-keygen -A && \
 
 
 WORKDIR /app
-COPY ./proxyagent-app/backend .
+# do not copy for the time being, instead 'backend' is mapped in  compose.yaml/volumes
+# COPY ./proxyagent-app/backend ./backend
 
 #EXPOSE 8000
 

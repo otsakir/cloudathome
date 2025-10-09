@@ -9,6 +9,6 @@ trap 'echo "Stopping Django and sshd..."; kill $(jobs -p); exit 0' SIGTERM
 /usr/sbin/sshd -D &
 
 # start django
-python manage.py runserver 0.0.0.0:8000 &
+python backend/manage.py runserver 0.0.0.0:8000 &
 
 wait

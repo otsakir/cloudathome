@@ -21,6 +21,8 @@ services:
     ports:
       - 8000:8000
       - 1122:1122
+    volumes:
+      - ./proxyagent-app/backend:/app/backend  # disable this in production mode and COPY backed in proxyagent.dockerfile
 
 volumes:
   haproxy-sockets:
