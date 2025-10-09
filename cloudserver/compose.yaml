@@ -1,0 +1,26 @@
+services:
+  haproxy:
+    build:
+      context: .
+      dockerfile: haproxy.dockerfile
+#    image: haproxy:2.8-alpine
+    volumes:
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - haproxy-sockets:/var/lib/haproxy/sockets
+    ports:
+      - "443:443"
+    user: haproxy
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
+
+  proxyagent:
+    build:
+      context: .
+      dockerfile: proxyagent.dockerfile
+    ports:
+      - 8000:8000
+      - 1122:1122
+
+volumes:
+  haproxy-sockets:
