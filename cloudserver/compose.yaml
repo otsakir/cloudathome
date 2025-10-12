@@ -1,28 +1,49 @@
 services:
-  haproxy:
+#  haproxy:
+#    build:
+#      context: .
+#      dockerfile: haproxy.dockerfile
+#    volumes:
+#      - ./docker/haproxy:/usr/local/etc/haproxy
+#    ports:
+#      - "443:443"
+#    user: haproxy
+#
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
+
+#  sshserver:
+#    image: linuxserver/openssh-server:version-10.0_p1-r9
+##    hostname: openssh-server #optional
+#    environment:
+#      - PUID=1000
+#      - PGID=1000
+#      - TZ=Etc/UTC
+#      - PUBLIC_KEY_FILE=/config/.ssh/authorized_keys
+#      - USER_NAME=admin
+#      - LOG_STDOUT= #optional
+#      - DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel
+#    volumes:
+#      - ./docker/sshserver/config:/config
+#    ports:
+#      - 2222:2222
+#    restart: unless-stopped
+
+  tunnelagent:
     build:
       context: .
-      dockerfile: haproxy.dockerfile
-#    image: haproxy:2.8-alpine
-    volumes:
-      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-      - haproxy-sockets:/var/lib/haproxy/sockets
+      dockerfile: tunnelagent.dockerfile
     ports:
-      - "443:443"
-    user: haproxy
+      - 8022:22
 
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
-
-  proxyagent:
-    build:
-      context: .
-      dockerfile: proxyagent.dockerfile
-    ports:
-      - 8000:8000
-      - 1122:1122
-    volumes:
-      - ./proxyagent-app/backend:/app/backend  # disable this in production mode and COPY backed in proxyagent.dockerfile
-
-volumes:
-  haproxy-sockets:
+#  proxyagent:
+#    build:
+#      context: .
+#      dockerfile: proxyagent.dockerfile
+#    ports:
+#      - 8000:8000
+#      - 1122:1122
+#    volumes:
+#      - ./proxyagent-app/backend:/app/backend  # disable this in production mode and COPY 'backend' in proxyagent.dockerfile
+#      - ./docker/haproxy/haproxy.cfg:/etc/haproxy/haproxy.cfg
+#      - haproxy-sockets:/var/lib/haproxy/sockets
