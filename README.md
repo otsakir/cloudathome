@@ -1,6 +1,6 @@
 ## About
 
-A system that allows running application servers at home and access them from the internet. Aims at giving service, data and identity control back to the real owner of them, the user.
+A system that allows running application servers at home and access them from the internet.
 
 
 ## Overview
