@@ -1,5 +1,6 @@
 asgiref==3.10.0
 Django==5.2.7
+django-autoslug==1.9.9
 djangorestframework==3.16.1
 sqlparse==0.5.3
 typing_extensions==4.15.0
