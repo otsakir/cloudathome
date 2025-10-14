@@ -5,5 +5,5 @@ from .models import ProxyMapping
 class ProxyMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProxyMapping
-        fields = ['id','port']
+        fields = ['id', 'name', 'slug', 'port']
 
