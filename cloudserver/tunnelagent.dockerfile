@@ -2,7 +2,7 @@ FROM python:3.12-alpine
 
 
 # install os system packages
-RUN apk add --no-cache openssh bash su-exec && \
+RUN apk add --no-cache openssh bash su-exec sudo && \
     mkdir -p /var/run/sshd && \
     ssh-keygen -A
 
@@ -25,6 +25,12 @@ RUN addgroup -S django && adduser -S django -G django
 RUN mkdir /opt/backend-var
 COPY ./tunnelagent/backend-var/db.sqlite3 /opt/backend-var/
 RUN chown -R django:django /opt/backend-var
+
+# tunnel users management scripts
+COPY ./docker/tunnelagent/scripts/create_tunnel_user.py /usr/local/bin/
+RUN chmod 700 /usr/local/bin/create_tunnel_user.py
+COPY ./docker/tunnelagent/sudoers.d/tunneling /etc/sudoers.d/
+RUN chmod 440 /etc/sudoers.d/tunneling
 
 #COPY . /opt/app # we map django code with 'volumes' in compose.yaml
 
