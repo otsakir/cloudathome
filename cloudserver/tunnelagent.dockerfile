@@ -26,9 +26,13 @@ RUN mkdir /opt/backend-var
 COPY ./tunnelagent/backend-var/db.sqlite3 /opt/backend-var/
 RUN chown -R django:django /opt/backend-var
 
+RUN mkdir -p /var/tunnelagent/public_keys
+RUN chown -R django:django /var/tunnelagent
+RUN chmod -R 700 /var/tunnelagent
+
 # tunnel users management scripts
-COPY ./docker/tunnelagent/scripts/create_tunnel_user.py /usr/local/bin/
-RUN chmod 700 /usr/local/bin/create_tunnel_user.py
+COPY tunnelagent/backend/external/tunnels/manage_tunnel.py /usr/local/bin/
+RUN chmod 700 /usr/local/bin/manage_tunnel.py
 COPY ./docker/tunnelagent/sudoers.d/tunneling /etc/sudoers.d/
 RUN chmod 440 /etc/sudoers.d/tunneling
 
@@ -39,7 +43,7 @@ WORKDIR /
 # Secure SSH
 RUN echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
-    echo "AllowUsers admin" >> /etc/ssh/sshd_config
+    echo "AllowUsers admin" > /etc/ssh/sshd_config.d/01-allowed_users.conf
 
 # Expose SSH port
 #EXPOSE 22
