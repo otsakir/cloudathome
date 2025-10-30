@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN addgroup -S django && adduser -S django -G django
 
 RUN mkdir /opt/backend-var
-COPY ./tunnelagent/backend-var/db.sqlite3 /opt/backend-var/
+COPY ./tunnelagent/backend/db.sqlite3 /opt/backend-var/
 RUN chown -R django:django /opt/backend-var
 
 RUN mkdir -p /var/tunnelagent/public_keys
