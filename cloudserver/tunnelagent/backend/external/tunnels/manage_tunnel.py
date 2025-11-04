@@ -102,9 +102,10 @@ class TunnelManager:
     def add_user_sshdconfig(self, username: str, port_base: int):
         config_file = open(self.get_user_sshdconfig_filename(username), 'w')
         config_file.write(f'Match User {username}\n')
-        for i in range(self.config.PORTS_PER_HOME):
-            port = port_base + i
-            config_file.write(f'    PermitListen {self.config.LISTENING_NETWORK_INTERFACE}:{port}\n')
+        listen_ports = " ".join([f'{self.config.LISTENING_NETWORK_INTERFACE}:{port}' for port in range(port_base, port_base+self.config.PORTS_PER_HOME)])
+        config_file.write(f'    PermitListen {listen_ports}\n')
+        config_file.write(f'    PermitTTY no\n')
+        config_file.write(f'    ForceCommand /bin/false\n')
         config_file.close()
 
     def remove_user_sshdconfig(self, username: str):
@@ -198,11 +199,11 @@ class TunnelManager:
 
         return parser
 
-# def enable_user(self, username):
-#     # echo "admin:*" | chpasswd -e && cd /home/admin
-#     result = subprocess.run(f'echo "{username}:*" | chpasswd -e', shell=True)
-#     if result.returncode != 0:
-#         raise UserError(f"error enabling user {username}")
+    def enable_user(self, username: str):
+        # echo "admin:*" | chpasswd -e && cd /home/admin
+        result = subprocess.run(f'echo "{username}:*" | chpasswd -e', shell=True)
+        if result.returncode != 0:
+            raise UserError(f"error enabling user {username}")
 #
 #
 # def disable_user(self, username):
@@ -258,6 +259,7 @@ if __name__ == '__main__':
 
     if args.command == 'add':
         tunnel_manager.create_tunnel_user(username, args.public)
+        tunnel_manager.enable_user(username)
         tunnel_manager.add_username_to_allow_users(username)
         home_port_base = tunnel_manager.get_home_port_base(args.home_id)
         tunnel_manager.add_user_sshdconfig(username, home_port_base)

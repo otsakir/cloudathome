@@ -19,6 +19,8 @@ services:
     ports:
       - 8022:22
       - 8000:8000
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.docker_settings
     volumes:
       - ./tunnelagent/backend:/opt/app
 

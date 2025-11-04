@@ -11,7 +11,7 @@ class ProxyMappingSerializer(serializers.ModelSerializer):
 
 
 class HomeSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=30, validators=[RegexValidator(regex='^[a-z0-9_-]{1,20}$')]) # TODO use same regex pattern as the one in manage_tunnel.py
+    name = serializers.CharField(max_length=30, required=False, validators=[RegexValidator(regex='^[a-z0-9_-]{1,20}$')]) # TODO use same regex pattern as the one in manage_tunnel.py
     public_key = serializers.CharField(max_length=800, required=True)
 
     def update(self, instance: Home, validated_data):

@@ -53,6 +53,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # <-- required for browsable API
+    ),
+}
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
@@ -124,3 +131,8 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Cloud-at-home settings
+
+CAH_PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'
