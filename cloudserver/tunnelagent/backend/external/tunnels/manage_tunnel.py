@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import re
 import os
@@ -5,7 +7,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Type
 
 
 class Config:
@@ -63,7 +64,7 @@ class TunnelManager:
         config_file = open(f'{self.config.SSHD_CONFIGD_PATH}/01-allowed_users.conf', 'r+')
 
         content = config_file.read().strip()
-        m = re.match(f'AllowUsers\s.* {username}( \S+)?$', content)
+        m = re.match(rf'AllowUsers\s.* {username}( \S+)?$', content)
         if m:
             print(f"user '{username}' is already in sshd_config AllowedUsers", file=sys.stderr)
             return False
@@ -82,12 +83,12 @@ class TunnelManager:
         config_file = open(f'{self.config.SSHD_CONFIGD_PATH}/01-allowed_users.conf', 'r+')
 
         content = config_file.read().strip()
-        m = re.match(f'.* {username}( \S.*)?$', content)
+        m = re.match(rf'.* {username}( \S.*)?$', content)
         if not m:
             print(f"user '{username}' is not in sshd_config AllowedUsers", file=sys.stderr)
             return False
 
-        content = re.sub(f'\s+{username}(\s+\S+|$)', r'\1', content)
+        content = re.sub(rf'\s+{username}(\s+\S+|$)', r'\1', content)
         config_file.seek(0)
         config_file.truncate()
         config_file.write(content)
@@ -117,7 +118,7 @@ class TunnelManager:
         """ Validates username suffix and builds up a proper username with prefix etc """
 
         if 0 <= home_index < self.config.MAX_HOME_COUNT:
-            m = re.match(f'^{self.config.USERNAME_SUFFIX_PATTERN}$', suffix)
+            m = re.match(rf'^{self.config.USERNAME_SUFFIX_PATTERN}$', suffix)
             if m:
                 username = f'{self.config.HOME_PREFIX}{home_index:02d}_{suffix}'
                 return username
@@ -137,7 +138,7 @@ class TunnelManager:
 
         # first create the user in the system
         # result = subprocess.run(['adduser', '--gecos', 'fullname', '--disabled-password', username])  # debian/ubuntu flavors
-        result = subprocess.run(['adduser', '-D', 'fullname', username])  # alpine linux flavors
+        result = subprocess.run(['adduser', '-D', username])  # alpine linux flavors
         if not result.returncode == 0:
             raise UserError("error creating user")
 
@@ -238,7 +239,7 @@ def get_public_key_file_type(config: Config):
         path_string = f'{config.PUBLIC_KEY_STORAGE_PATH}/{filename}'
         path = Path(path_string)
         if not path.is_file():
-            raise argparse.ArgumentTypeError('public key path does not point to a file')
+            raise argparse.ArgumentTypeError(f'public key not found in {config.PUBLIC_KEY_STORAGE_PATH}')
         if not os.access(path_string, os.R_OK):
             raise argparse.ArgumentTypeError('public key file is not readable')
         return filename
