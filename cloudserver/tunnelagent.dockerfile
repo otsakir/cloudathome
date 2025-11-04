@@ -43,6 +43,7 @@ WORKDIR /
 # Secure SSH
 RUN echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
+    echo "AllowTcpForwarding yes" > /etc/ssh/sshd_config.d/00-prologue.conf && \
     echo "AllowUsers admin" > /etc/ssh/sshd_config.d/01-allowed_users.conf
 
 # Expose SSH port
