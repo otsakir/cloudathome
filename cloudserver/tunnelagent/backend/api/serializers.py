@@ -2,6 +2,7 @@ import sys
 from rest_framework import serializers
 from .models import ProxyMapping, Home
 from django.core.validators import RegexValidator
+from external.tunnels.manage_tunnel import tunnel_manager
 
 
 class ProxyMappingSerializer(serializers.ModelSerializer):
@@ -24,7 +25,27 @@ class HomeSerializer(serializers.Serializer):
 
         instance.save()
 
-        # fields = ['name', 'public_key']
+
+class OutHomeSerializer(serializers.ModelSerializer):
+
+    ssh_username = serializers.SerializerMethodField()
+    port_base = serializers.SerializerMethodField()
+    port_count = serializers.SerializerMethodField()
+
+    def get_ssh_username(self, obj: Home):
+        ssh_username = tunnel_manager.make_username(home_index=obj.home_index, suffix=obj.name)
+        return ssh_username
+
+    def get_port_base(self, obj: Home):
+        port_base = tunnel_manager.get_home_port_base(home_id=obj.home_index)
+        return port_base
+
+    def get_port_count(self, obj: Home):
+        return tunnel_manager.config.PORTS_PER_HOME
+
+    class Meta:
+        model = Home
+        fields = ['name', 'ssh_username', 'port_base', 'port_count']
 
 
 

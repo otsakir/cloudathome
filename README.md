@@ -19,6 +19,15 @@ A system that allows running application servers at home and access them from th
 * **HomeGateway** - A linux machine plugged to the home network (behind NAT(s)) that represents the owner of the system and services and controls the overall operation of the system. It makes forwarding requests to the ProxyAgent running on the cloud server.  It sets up ssh tunnels from the cloud server to the home network. It contains a web app with UI to manage the system.
 
 
+## API
+
+The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
+
+- Swagger UI: `http://localhost:8000/api/schema/swagger/`
+- ReDoc: `http://localhost:8000/api/schema/redoc/`
+- OpenAPI schema (JSON): `http://localhost:8000/api/schema/`
+
+
 
 
 

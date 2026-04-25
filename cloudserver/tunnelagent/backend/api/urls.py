@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import ProxyMappingListCreateView, ProxyMappingDestroyAPIView,ProxyInstanceAPIView, HomeCreateView, \
-    HomeDeleteView
+    HomeRetrieveApiView, HomeListAPIView
 
 
 urlpatterns = [
@@ -9,6 +9,6 @@ urlpatterns = [
 
     path('api/proxy/instance/', ProxyInstanceAPIView.as_view(), name='proxy-instance'),
 
-    path('api/homes/', HomeCreateView.as_view(), name='create-home'),
-    path('api/homes/<int:pk>', HomeDeleteView.as_view(), name='delete-home'),
+    path('api/homes/', HomeListAPIView.as_view(), name='create-list-home'),
+    path('api/homes/<int:pk>', HomeRetrieveApiView.as_view(), name='retrieve-delete-home'),
 ]
