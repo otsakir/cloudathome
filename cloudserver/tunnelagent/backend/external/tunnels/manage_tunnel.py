@@ -115,7 +115,7 @@ class TunnelManager:
         except FileNotFoundError as e:
             print(f"error removing user specific ssh file '{config_filename}'", file=sys.stderr)
 
-    def make_username(self, home_index: int, suffix: str):
+    def make_username(self, home_index: int, suffix: str) -> str:
         """ Validates username suffix and builds up a proper username with prefix etc """
 
         if 0 <= home_index < self.config.MAX_HOME_COUNT:
@@ -130,7 +130,7 @@ class TunnelManager:
 
 
     def get_home_port_base(self, home_id: int):
-        home_ports_base = self.config.HOME_PORTS_BASE + (args.home_id - 1) * self.config.PORTS_PER_HOME_RESERVED
+        home_ports_base = self.config.HOME_PORTS_BASE + (home_id - 1) * self.config.PORTS_PER_HOME_RESERVED
         return home_ports_base
 
 
@@ -245,6 +245,9 @@ def get_public_key_file_type(config: Config):
             raise argparse.ArgumentTypeError('public key file is not readable')
         return filename
     return public_key_file_type
+
+
+tunnel_manager = TunnelManager(Config())
 
 
 #print(args.command)

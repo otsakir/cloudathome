@@ -1,9 +1,9 @@
 import sys
 
-from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 from .models import ProxyMapping, Home
-from .serializers import ProxyMappingSerializer, HomeSerializer
+from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
 from rest_framework.parsers import JSONParser
@@ -43,7 +43,12 @@ class HomeCreateView(APIView):
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class HomeDeleteView(APIView):
+class HomeRetrieveApiView(RetrieveAPIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    queryset = Home.objects.filter(assigned=True)
+    serializer_class = OutHomeSerializer
+
     def delete(self, request, pk):
         print('deleting home', pk)
         try:
@@ -57,6 +62,29 @@ class HomeDeleteView(APIView):
             home.assigned = False
             home.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HomeListAPIView(ListAPIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    queryset = Home.objects.filter(assigned=True)
+    serializer_class = OutHomeSerializer
+
+
+# class HomeDeleteView(APIView):
+#     def delete(self, request, pk):
+#         print('deleting home', pk)
+#         try:
+#             home = Home.objects.get(pk=pk)
+#         except Home.DoesNotExist as e:
+#             return Response(status=status.HTTP_404_NOT_FOUND)
+#
+#         if home.assigned:
+#             home.name = None
+#             home.public_key = None
+#             home.assigned = False
+#             home.save()
+#         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 
