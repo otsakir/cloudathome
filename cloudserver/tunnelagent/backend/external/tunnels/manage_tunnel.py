@@ -14,7 +14,7 @@ class Config:
     PORTS_PER_HOME = 10
     SSHD_CONFIGD_PATH = '/etc/ssh/sshd_config.d'
     SSHD_PID = '/var/run/sshd.pid'  # /var/run/sshd.pid for alpine
-    LISTENING_NETWORK_INTERFACE = '127.0.0.1'
+    LISTENING_NETWORK_INTERFACE = '0.0.0.0'
     # PUBLIC_KEY_STORAGE_PATH = '/tmp/public_keys'    # directory to transfer public keys to the script - for testing
     PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'    # directory to transfer public keys to the script
 
