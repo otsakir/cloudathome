@@ -1,9 +1,9 @@
 import sys
 
-from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.views import APIView
 from .models import ProxyMapping, Home
-from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer
+from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer, CreateHomeSerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
 from rest_framework.parsers import JSONParser
@@ -12,80 +12,63 @@ from rest_framework import status
 from external.services import ElevatedOperations
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 
-class HomeCreateView(APIView):
-    # queryset = Home.objects.all()
-    # serializer_class = HomeSerializer
-    authentication_classes = [SessionAuthentication]
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        request_data = dict(request.data)
-        request_data.update(name=request.user.username)
-        s = HomeSerializer(data=request_data)
-        if s.is_valid():
-            validated_data = s.validated_data
-            print('validated data:', s.validated_data, file=sys.stderr)
-            available_home: Home = Home.objects.filter(assigned=False).first()
-            if not available_home:
-                return Response({'message': 'no available home slots'}, status=status.HTTP_409_CONFLICT)
-
-            validated_data['assigned'] = True
-            # validated_data['name'] = request.user.username
-            s.update(available_home, validated_data)
-
-            # create system user
-            ElevatedOperations.add_home_user(available_home.home_index, self.request.user.username,  available_home.public_key)
-
-            return Response({})
-        else:
-            return Response({}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class HomeRetrieveApiView(RetrieveAPIView):
+class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     queryset = Home.objects.filter(assigned=True)
     serializer_class = OutHomeSerializer
 
-    def delete(self, request, pk):
-        print('deleting home', pk)
-        try:
-            home = Home.objects.get(pk=pk)
-        except Home.DoesNotExist as e:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+    def destroy(self, request, pk, *args, **kwargs):
+        home = self.get_object()
 
-        if home.assigned:
-            home.name = None
-            home.public_key = None
-            home.assigned = False
-            home.save()
+        try:
+            ElevatedOperations.remove_home_user(home.home_index, home.name)
+        except Exception:
+            return Response({'message': 'failed to remove tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        home.name = None
+        home.public_key = None
+        home.assigned = False
+        home.save()
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class HomeListAPIView(ListAPIView):
+class HomeListCreateAPIView(ListCreateAPIView):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     queryset = Home.objects.filter(assigned=True)
     serializer_class = OutHomeSerializer
 
+    @extend_schema(
+        request=CreateHomeSerializer,
+        responses={
+            201: OutHomeSerializer,
+            409: OpenApiResponse(description='No available home slots'),
+            500: OpenApiResponse(description='Failed to create tunnel user'),
+        },
+    )
+    def post(self, request):
+        s = CreateHomeSerializer(data=request.data)
+        if not s.is_valid():
+            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# class HomeDeleteView(APIView):
-#     def delete(self, request, pk):
-#         print('deleting home', pk)
-#         try:
-#             home = Home.objects.get(pk=pk)
-#         except Home.DoesNotExist as e:
-#             return Response(status=status.HTTP_404_NOT_FOUND)
-#
-#         if home.assigned:
-#             home.name = None
-#             home.public_key = None
-#             home.assigned = False
-#             home.save()
-#         return Response(status=status.HTTP_204_NO_CONTENT)
+        available_home = Home.objects.filter(assigned=False).first()
+        if not available_home:
+            return Response({'message': 'no available home slots'}, status=status.HTTP_409_CONFLICT)
 
+        try:
+            ElevatedOperations.add_home_user(available_home.home_index, request.user.username, s.validated_data['public_key'])
+        except Exception:
+            return Response({'message': 'failed to create tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        HomeSerializer().update(available_home, {**s.validated_data, 'name': request.user.username})
+
+        return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
 
 
 class ProxyMappingListCreateView(ListCreateAPIView):
