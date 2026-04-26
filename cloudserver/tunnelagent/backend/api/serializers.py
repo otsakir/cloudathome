@@ -26,6 +26,10 @@ class HomeSerializer(serializers.Serializer):
         instance.save()
 
 
+class CreateHomeSerializer(serializers.Serializer):
+    public_key = serializers.CharField(max_length=800)
+
+
 class OutHomeSerializer(serializers.ModelSerializer):
 
     ssh_username = serializers.SerializerMethodField()

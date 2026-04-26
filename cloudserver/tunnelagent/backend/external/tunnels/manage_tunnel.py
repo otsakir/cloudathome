@@ -130,7 +130,7 @@ class TunnelManager:
 
 
     def get_home_port_base(self, home_id: int):
-        home_ports_base = self.config.HOME_PORTS_BASE + (home_id - 1) * self.config.PORTS_PER_HOME_RESERVED
+        home_ports_base = self.config.HOME_PORTS_BASE + (home_id) * self.config.PORTS_PER_HOME_RESERVED
         return home_ports_base
 
 
@@ -157,7 +157,7 @@ class TunnelManager:
     def drop_tunnel_user(self, username: str):
         result = subprocess.run(['deluser', username])
         if not result.returncode == 0:
-            print(f'error removing user {username}', file=sys.stderr)
+            print(f'could not remove user {username} so i assume it is not present already', file=sys.stderr)
             # raise UserError("error removing user")
         # TODO remove user directory safely
         assert username.startswith(self.config.HOME_PREFIX) # make sure 'username' is that of a home_* user
@@ -257,7 +257,6 @@ if __name__ == '__main__':
     tunnel_manager = TunnelManager(Config())
     parser = tunnel_manager.get_parser()
     args = parser.parse_args()
-
     username = tunnel_manager.make_username(args.home_id, args.user_suffix)
 
     if args.command == 'add':
