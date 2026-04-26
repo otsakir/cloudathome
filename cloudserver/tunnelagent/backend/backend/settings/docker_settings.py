@@ -8,3 +8,7 @@ DATABASES = {
     }
 }
 
+HAPROXY_ENABLED = True
+HAPROXY_API_HOST = 'haproxy'
+HAPROXY_API_PORT = 9999
+

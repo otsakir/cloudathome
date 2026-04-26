@@ -1,20 +1,30 @@
 from django.db import models
+from django.contrib.auth.models import User
 from autoslug import AutoSlugField
-from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
+
+from external.tunnels.manage_tunnel import tunnel_manager
 
 
 class ProxyMapping(models.Model):
-    port = models.IntegerField(unique=True)
-    slug = AutoSlugField(populate_from='name', unique=True)
-    name = models.CharField(max_length=50)
+    SCHEME_HTTPS = 'https'
+    SCHEME_CHOICES = [(SCHEME_HTTPS, 'HTTPS')]
+
+    home = models.ForeignKey('Home', on_delete=models.CASCADE, related_name='proxy_mappings')
+    host = models.CharField(max_length=253, unique=True)
+    local_port = models.IntegerField()
+    scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
+    slug = AutoSlugField(populate_from='host', unique=True)
 
 
 class Home(models.Model):
-    name = models.CharField(max_length=30, blank=True, null=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name='homes')
     home_index = models.IntegerField(primary_key=True, validators=[MinValueValidator(0), MaxValueValidator(9)])
     public_key = models.TextField(max_length=800, blank=True, null=True)
-    assigned = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'Home {self.home_index}: name:{self.name}, assigned: {self.assigned}'
+        return f'Home {self.home_index}: user: {self.user},  ssh_username: {self.get_username}'
 
+    @property
+    def get_username(self):
+        return tunnel_manager.make_username(home_index=self.home_index, suffix=self.user.username) if self.user else None
