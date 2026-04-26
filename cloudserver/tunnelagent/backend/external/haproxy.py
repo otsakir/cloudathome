@@ -24,7 +24,7 @@ class HAProxyService:
 
     @classmethod
     def add_mapping(cls, mapping):
-        cls._send_command(f'set map {MAP_FILE} {mapping.host} tunnel_{mapping.local_port}')
+        cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.local_port}')
 
     @classmethod
     def remove_mapping(cls, mapping):
