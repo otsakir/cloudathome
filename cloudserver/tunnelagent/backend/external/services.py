@@ -17,10 +17,16 @@ class ElevatedOperations:
             f.write(public_key)
 
         subprocess.run(['sudo', 'manage_tunnel.py', 'add', username, str(home_id), '-p', public_key_filename], check=True)
+        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
 
     @staticmethod
     def remove_home_user(home_id: int, username: str):
         subprocess.run(['sudo', 'manage_tunnel.py', 'remove', username, str(home_id)], check=True)
+        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
+
+    @staticmethod
+    def reload_tunnel_users():
+        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
 
 
 

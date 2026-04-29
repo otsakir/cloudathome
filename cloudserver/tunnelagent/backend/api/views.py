@@ -156,3 +156,29 @@ class ProxyMappingDumpView(APIView):
         except Exception:
             return Response({'message': 'failed to read proxy mappings from haproxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(entries)
+
+
+class HomeSyncView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        import pwd
+        from external.services import ElevatedOperations as EO
+
+        homes = list(Home.objects.filter(user__isnull=False).select_related('user'))
+        reconciled = 0
+        for home in homes:
+            try:
+                pwd.getpwnam(home.get_username)
+            except KeyError:
+                try:
+                    EO.add_home_user(home.home_index, home.user.username, home.public_key)
+                    reconciled += 1
+                except Exception:
+                    return Response(
+                        {'message': f'failed to recreate user for home {home.home_index}'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+        return Response({'reconciled': reconciled})
