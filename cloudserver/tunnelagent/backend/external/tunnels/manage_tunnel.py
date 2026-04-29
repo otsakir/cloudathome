@@ -197,6 +197,8 @@ class TunnelManager:
                                                                   'Use a proper POSIX username syntax.'))
         remove_parser.add_argument('home_id', type=get_home_type(self.config))
 
+        subparsers.add_parser('reload', help='Reload sshd configuration')
+
         return parser
 
     def enable_user(self, username: str):
@@ -257,17 +259,18 @@ if __name__ == '__main__':
     tunnel_manager = TunnelManager(Config())
     parser = tunnel_manager.get_parser()
     args = parser.parse_args()
-    username = tunnel_manager.make_username(args.home_id, args.user_suffix)
 
     if args.command == 'add':
+        username = tunnel_manager.make_username(args.home_id, args.user_suffix)
         tunnel_manager.create_tunnel_user(username, args.public)
         tunnel_manager.enable_user(username)
         tunnel_manager.add_username_to_allow_users(username)
         home_port_base = tunnel_manager.get_home_port_base(args.home_id)
         tunnel_manager.add_user_sshdconfig(username, home_port_base)
-        tunnel_manager.reload_sshd_config()
     elif args.command == 'remove':
+        username = tunnel_manager.make_username(args.home_id, args.user_suffix)
         tunnel_manager.drop_tunnel_user(username)
         tunnel_manager.remove_username_from_allow_users(username)
         tunnel_manager.remove_user_sshdconfig(username)
+    elif args.command == 'reload':
         tunnel_manager.reload_sshd_config()

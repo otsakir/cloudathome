@@ -24,6 +24,7 @@ services:
       DJANGO_SETTINGS_MODULE: backend.settings.docker_settings
     volumes:
       - ./tunnelagent/backend:/opt/app
+      - ./tunnelagent/var:/opt/backend-var
 
 #  proxyagent:
 #    build:
