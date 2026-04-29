@@ -18,6 +18,14 @@ A system that allows running application servers at home and access them from th
 
 * **HomeGateway** - A linux machine plugged to the home network (behind NAT(s)) that represents the owner of the system and services and controls the overall operation of the system. It makes forwarding requests to the ProxyAgent running on the cloud server.  It sets up ssh tunnels from the cloud server to the home network. It contains a web app with UI to manage the system.
 
+### How it works
+
+  1. A home server registers with the cloud via a REST API, providing an SSH public key.
+  2. The cloud creates a dedicated system user and SSH tunnel endpoint for that home.
+  3. The home's gateway establishes an SSH reverse tunnel to the cloud server on an assigned port.
+  4. The home creates a proxy mapping (hostname → tunnel port), which the cloud writes into HAProxy's SNI map at runtime.
+  5. Incoming HTTPS traffic hits HAProxy on port 443, which routes it by SNI hostname through the tunnel to the home server — no cloud-side firewall changes, no reload needed.
+
 
 ## API
 

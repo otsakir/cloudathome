@@ -12,7 +12,7 @@ from rest_framework import status
 from external.services import ElevatedOperations
 from external.haproxy import HAProxyService
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 
@@ -131,3 +131,28 @@ class ProxyInstanceAPIView(APIView):
     def get(self, request):
         print('in ProxyInstance GET')
         pass
+
+
+class ProxyMappingSyncView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        mappings = list(ProxyMapping.objects.select_related('home').all())
+        try:
+            HAProxyService.sync_mappings(mappings)
+        except Exception:
+            return Response({'message': 'failed to sync proxy mappings'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'synced': len(mappings)})
+
+
+class ProxyMappingDumpView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        try:
+            entries = HAProxyService.dump_mappings()
+        except Exception:
+            return Response({'message': 'failed to read proxy mappings from haproxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(entries)

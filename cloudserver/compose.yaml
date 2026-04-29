@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: haproxy.dockerfile
     volumes:
-      - ./docker/haproxy:/usr/local/etc/haproxy
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - haproxy_maps:/usr/local/etc/haproxy/maps
     ports:
       - "443:443"
     user: haproxy
@@ -35,3 +36,6 @@ services:
 #      - ./proxyagent-app/backend:/app/backend  # disable this in production mode and COPY 'backend' in proxyagent.dockerfile
 #      - ./docker/haproxy/haproxy.cfg:/etc/haproxy/haproxy.cfg
 #      - haproxy-sockets:/var/lib/haproxy/sockets
+
+volumes:
+  haproxy_maps:
