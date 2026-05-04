@@ -64,6 +64,9 @@ class HomeListCreateAPIView(ListCreateAPIView):
         if not s.is_valid():
             return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        if Home.objects.filter(user=request.user).exists():
+            return Response({'message': 'user already has a home'}, status=status.HTTP_409_CONFLICT)
+
         available_home = Home.objects.filter(user__isnull=True).first()
         if not available_home:
             return Response({'message': 'no available home slots'}, status=status.HTTP_409_CONFLICT)

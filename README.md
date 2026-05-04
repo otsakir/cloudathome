@@ -34,6 +34,7 @@ The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
 - Swagger UI: `http://localhost:8000/api/schema/swagger/`
 - ReDoc: `http://localhost:8000/api/schema/redoc/`
 - OpenAPI schema (JSON): `http://localhost:8000/api/schema/`
+- DRF login: http://localhost:8000/api-auth/login/
 
 
 ## Setting up a tunnel (walkthrough)
