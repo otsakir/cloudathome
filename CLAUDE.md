@@ -49,7 +49,10 @@ In local dev `HAPROXY_ENABLED=False` so HAProxy calls are skipped silently.
 ```bash
 sudo python cloudserver/tunnelagent/backend/external/tunnels/manage_tunnel.py add <suffix> <home_id> -p <pubkey_file>
 sudo python cloudserver/tunnelagent/backend/external/tunnels/manage_tunnel.py remove <suffix> <home_id>
+sudo python cloudserver/tunnelagent/backend/external/tunnels/manage_tunnel.py reload
 ```
+
+`add` and `remove` do not reload sshd automatically; `reload` must be called separately (as `ElevatedOperations` in `services.py` does).
 
 ## Architecture
 
@@ -102,12 +105,18 @@ cloudserver/
         │   └── docker_settings.py
         ├── api/                          # DRF app: models, views, serializers, urls
         │   ├── models.py                 # ProxyMapping, Home
+        │   ├── apps.py                   # AppConfig; syncs HAProxy SNI map from DB on startup
         │   ├── views.py
         │   ├── serializers.py
-        │   └── urls.py
+        │   ├── urls.py
+        │   ├── tests.py
+        │   └── management/
+        │       └── commands/
+        │           └── reconcile_tunnel_users.py  # Recreates missing system users on startup
         └── external/
             ├── services.py               # ElevatedOperations (sudo wrapper)
             ├── haproxy.py                # HAProxy Runtime API client (set/del map via TCP socket)
+            ├── tests/                    # Tests for external integrations
             └── tunnels/
                 └── manage_tunnel.py      # Core tunnel user management script
 ```
@@ -122,5 +131,8 @@ cloudserver/
 | GET | `/api/proxy-mappings/` | List caller's proxy mappings (auth required) |
 | POST | `/api/proxy-mappings/` | Create a forwarding rule and update HAProxy map |
 | DELETE | `/api/proxy-mappings/<slug>/` | Remove a forwarding rule and update HAProxy map |
+| POST | `/api/admin/proxy-mappings/sync` | Re-sync all DB mappings to HAProxy (admin only) |
+| GET | `/api/admin/proxy-mappings/haproxy` | Dump current HAProxy SNI map entries (admin only) |
+| POST | `/api/admin/homes/sync` | Reconcile DB homes with system users (admin only) |
 
 Authentication is session-based. All endpoints require a logged-in user. Proxy mappings are scoped to the caller's own homes.
