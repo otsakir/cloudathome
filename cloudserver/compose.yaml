@@ -5,10 +5,15 @@ services:
       dockerfile: haproxy.dockerfile
     volumes:
       - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - haproxy_maps:/usr/local/etc/haproxy/maps
     ports:
       - "443:443"
     user: haproxy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9999 || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
     extra_hosts:
       - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
@@ -17,6 +22,9 @@ services:
     build:
       context: .
       dockerfile: tunnelagent.dockerfile
+    depends_on:
+      haproxy:
+        condition: service_healthy
     ports:
       - 8022:22
       - 8000:8000
@@ -38,5 +46,3 @@ services:
 #      - ./docker/haproxy/haproxy.cfg:/etc/haproxy/haproxy.cfg
 #      - haproxy-sockets:/var/lib/haproxy/sockets
 
-volumes:
-  haproxy_maps:

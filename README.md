@@ -41,9 +41,13 @@ The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
 
 This walkthrough uses `localhost` as the cloud server address (i.e. the stack is running locally via Docker Compose). Replace it with your actual cloud server hostname for a real deployment.
 
-### 1. Register a home
+### 1. Create a django user
 
-POST to `/api/homes/` while logged in as `alice`, passing your SSH public key. Make sure to pass
+The actual process to create a user for the cloudserver platform is not yet known. We're assuming that you have a plain django user named `alice`.
+
+### 2. Register a home
+
+POST to `/api/homes/` while logged in as `alice`, passing your SSH public key to the body. Make sure to pass
 proper authentication headers, `sessionid` etc. accordingly:
 
 ```bash
@@ -65,9 +69,11 @@ The response contains everything needed to connect:
 }
 ```
 
-### 2. Open the reverse SSH tunnel
+### 3. Open the reverse SSH tunnel
 
-From the home machine, forward a port on the cloud server back to a local port. Use `port_base` from the response as the remote port:
+From the home machine initiate a reverse port forwarding command. Map an internal port on the cloud server back to a 
+`host:port` at the local network of the home machine. Use `port_base` from the response of the previous step as the 
+remote port:
 
 ```bash
 ssh -N -T -R 127.0.0.1:2000:127.0.0.1:2600 home00_alice@localhost -p 8022
@@ -75,7 +81,21 @@ ssh -N -T -R 127.0.0.1:2000:127.0.0.1:2600 home00_alice@localhost -p 8022
 
 This maps **port 2000 on the cloud server** → **port 2600 on the home machine**. The connection will appear to hang — that is correct; it is holding the tunnel open.
 
-### 3. Start a listener on the home machine
+### 4. Create a proxy mapping 
+
+Next, you need to create a proxy mapping. This entails creating the django `proxy-mapping` entity and the respective
+state in _haproxy_. Again, make sure you provide authorization information as this is a user-scoped operation.
+
+```
+    POST /api/proxy-mappings/ {
+      "host": "localhost",
+      "local_port": 200,
+      "scheme": "https",
+      "home": 1
+    }
+```
+
+### 5. Start a listener on the home machine
 
 In a separate terminal, start a netcat listener on the local port used above (2600):
 
@@ -83,7 +103,7 @@ In a separate terminal, start a netcat listener on the local port used above (26
 nc -l -p 2600
 ```
 
-### 4. Send a request through the tunnel
+### 6. Send a request through the tunnel
 
 From the cloud server (or any machine with access to it), connect to the tunnel port:
 
