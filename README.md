@@ -41,9 +41,9 @@ The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
 
 This walkthrough uses `localhost` as the cloud server address (i.e. the stack is running locally via Docker Compose). Replace it with your actual cloud server hostname for a real deployment.
 
-### 1. Create a django user
+### 1. Create a user
 
-The actual process to create a user for the cloudserver platform is not yet known. We're assuming that you have a plain django user named `alice`.
+The actual process to create a user for the cloudserver platform is not yet settled. We're assuming that you have a plain django user named `alice`.
 
 ### 2. Register a home
 
@@ -95,23 +95,25 @@ state in _haproxy_. Again, make sure you provide authorization information as th
     }
 ```
 
-### 5. Start a listener on the home machine
+### 5. Start a listening server 
 
-In a separate terminal, start a netcat listener on the local port used above (2600):
+At your home machine, in a separate terminal, start a netcat listener on the local port used above (2600):
 
 ```bash
 nc -l -p 2600
 ```
 
-### 6. Send a request through the tunnel
+### 6. Make a request through the tunnel
 
 From the cloud server (or any machine with access to it), connect to the tunnel port:
 
 ```bash
-curl http://localhost:2000
+curl https://localhost
 ```
 
-The request travels through the SSH tunnel and arrives at the `nc` listener on the home machine. Anything typed into the `nc` terminal is sent back as the response.
+The request reaches haproxy, is reverse proxied to the internal port where the SSH tunnel 
+listens to, it travels through the SSH tunnel and arrives at the `nc` listener at the home machine. Anything typed
+into the `nc` terminal is sent back as the response.
 
 
 
