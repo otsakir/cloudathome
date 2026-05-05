@@ -1,4 +1,5 @@
 import sys
+import secrets
 
 from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.views import APIView
@@ -6,6 +7,7 @@ from .models import ProxyMapping, Home
 from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer, CreateHomeSerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
+from django.shortcuts import get_object_or_404
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework import status
@@ -21,15 +23,13 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OutHomeSerializer
+    lookup_field = 'slug'
 
     def get_queryset(self):
         return Home.objects.filter(user=self.request.user)
 
-    def destroy(self, request, pk, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):
         home = self.get_object()
-
-        if home.user is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
 
         try:
             ElevatedOperations.remove_home_user(home.home_index, home.user.username)
@@ -38,6 +38,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
         home.public_key = None
         home.user = None
+        home.slug = None
         home.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -76,7 +77,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
         except Exception:
             return Response({'message': 'failed to create tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        HomeSerializer().update(available_home, {**s.validated_data, 'user': request.user})
+        HomeSerializer().update(available_home, {**s.validated_data, 'user': request.user, 'slug': secrets.token_urlsafe(16)})
 
         return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
 
@@ -86,19 +87,19 @@ class ProxyMappingListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingSerializer
 
+    def get_home(self):
+        return get_object_or_404(Home, slug=self.kwargs['home_slug'], user=self.request.user)
+
     def get_queryset(self):
-        return ProxyMapping.objects.filter(home__user=self.request.user)
+        return ProxyMapping.objects.filter(home=self.get_home())
 
     def create(self, request, *args, **kwargs):
-        serializer = ProxyMappingSerializer(data=request.data)
+        home = self.get_home()
+        serializer = ProxyMappingSerializer(data=request.data, context={'home': home})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        home = serializer.validated_data['home']
-        if home.user != request.user:
-            return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
-
-        mapping = serializer.save()
+        mapping = serializer.save(home=home)
 
         try:
             HAProxyService.add_mapping(mapping)
@@ -116,7 +117,10 @@ class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        return ProxyMapping.objects.filter(home__user=self.request.user)
+        return ProxyMapping.objects.filter(
+            home__slug=self.kwargs['home_slug'],
+            home__user=self.request.user,
+        )
 
     def destroy(self, request, *args, **kwargs):
         mapping = self.get_object()
