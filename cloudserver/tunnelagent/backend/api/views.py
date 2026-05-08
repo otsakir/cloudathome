@@ -4,7 +4,7 @@ import secrets
 from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.views import APIView
 from .models import ProxyMapping, Home
-from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer, CreateHomeSerializer
+from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -12,7 +12,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework import status
 from external.services import ElevatedOperations
-from external.haproxy import HAProxyService
+from external.services import HAProxyService
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -53,7 +53,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
         return Home.objects.filter(user=self.request.user)
 
     @extend_schema(
-        request=CreateHomeSerializer,
+        request=HomeSerializer,
         responses={
             201: OutHomeSerializer,
             409: OpenApiResponse(description='No available home slots'),
@@ -61,7 +61,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
         },
     )
     def post(self, request):
-        s = CreateHomeSerializer(data=request.data)
+        s = HomeSerializer(data=request.data)
         if not s.is_valid():
             return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
