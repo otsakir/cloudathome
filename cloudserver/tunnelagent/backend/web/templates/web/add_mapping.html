@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+
+{% block title %}Add proxy mapping — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Add proxy mapping</h1>
+<p>Map a public hostname to a port on your home tunnel (ports {{ home_port_base }}–{{ home_port_max }}).</p>
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% for error in field.errors %}
+        <p><strong>{{ error }}</strong></p>
+      {% endfor %}
+    </div>
+    <br>
+  {% endfor %}
+  <button type="submit">Add mapping</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+{% endblock %}

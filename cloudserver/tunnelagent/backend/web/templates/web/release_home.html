@@ -1,0 +1,20 @@
+{% extends "web/base.html" %}
+
+{% block title %}Release home — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Release home</h1>
+<p>
+  You are about to release home slot <strong>{{ home.home_index }}</strong>
+  (SSH username: <code>{{ home.get_username }}</code>).
+</p>
+<p>
+  This will remove your SSH tunnel user and delete all proxy mappings.
+  This action cannot be undone.
+</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit">Confirm release</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+{% endblock %}

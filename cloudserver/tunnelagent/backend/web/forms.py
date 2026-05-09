@@ -3,7 +3,8 @@ import re
 from django import forms
 from django.contrib.auth.models import User
 
-from homes.tunnels.manage_tunnel import Config
+from homes.models import ProxyMapping
+from homes.tunnels.manage_tunnel import Config, tunnel_manager
 
 _USERNAME_PATTERN = re.compile(f'^{Config.USERNAME_SUFFIX_PATTERN}$')
 
@@ -30,3 +31,37 @@ class SignupForm(forms.Form):
         if cleaned.get('password') != cleaned.get('password_confirm'):
             self.add_error('password_confirm', 'Passwords do not match.')
         return cleaned
+
+
+class RegisterHomeForm(forms.Form):
+    public_key = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4}),
+        label='SSH public key',
+        max_length=800,
+    )
+
+
+class AddMappingForm(forms.Form):
+    host = forms.CharField(max_length=253, label='Hostname')
+    local_port = forms.IntegerField(label='Local port')
+
+    def __init__(self, *args, home=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.home = home
+
+    def clean_host(self):
+        host = self.cleaned_data['host']
+        if ProxyMapping.objects.filter(host=host).exists():
+            raise forms.ValidationError('A mapping for this hostname already exists.')
+        return host
+
+    def clean_local_port(self):
+        port = self.cleaned_data['local_port']
+        if self.home:
+            port_base = tunnel_manager.get_home_port_base(self.home.home_index)
+            port_max = port_base + tunnel_manager.config.PORTS_PER_HOME - 1
+            if not (port_base <= port <= port_max):
+                raise forms.ValidationError(
+                    f'Port must be between {port_base} and {port_max} for your home slot.'
+                )
+        return port
