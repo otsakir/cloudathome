@@ -31,7 +31,7 @@ RUN chown -R django:django /var/tunnelagent
 RUN chmod -R 700 /var/tunnelagent
 
 # tunnel users management scripts
-COPY tunnelagent/backend/external/tunnels/manage_tunnel.py /usr/local/bin/
+COPY tunnelagent/backend/homes/tunnels/manage_tunnel.py /usr/local/bin/
 RUN chmod 700 /usr/local/bin/manage_tunnel.py
 COPY ./docker/tunnelagent/sudoers.d/tunneling /etc/sudoers.d/
 RUN chmod 440 /etc/sudoers.d/tunneling

@@ -1,14 +1,14 @@
 import sys
 from rest_framework import serializers
-from .models import ProxyMapping, Home
-from external.tunnels.manage_tunnel import tunnel_manager
+from homes.models import ProxyMapping, Home
+from homes.tunnels.manage_tunnel import tunnel_manager
 
 
 class ProxyMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProxyMapping
-        fields = ['id', 'slug', 'host', 'local_port', 'scheme']
-        read_only_fields = ['id', 'slug']
+        fields = ['id', 'host', 'local_port', 'scheme']
+        read_only_fields = ['id']
 
     def validate_scheme(self, value):
         if value != ProxyMapping.SCHEME_HTTPS:

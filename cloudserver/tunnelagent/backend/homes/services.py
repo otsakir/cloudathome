@@ -74,6 +74,3 @@ class ElevatedOperations:
     @staticmethod
     def reload_tunnel_users():
         subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
-
-
-

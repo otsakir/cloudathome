@@ -1,9 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
-from autoslug import AutoSlugField
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-from external.tunnels.manage_tunnel import tunnel_manager
+from homes.tunnels.manage_tunnel import tunnel_manager
 
 
 class ProxyMapping(models.Model):
@@ -14,7 +13,6 @@ class ProxyMapping(models.Model):
     host = models.CharField(max_length=253, unique=True)
     local_port = models.IntegerField()
     scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
-    slug = AutoSlugField(populate_from='host', unique=True)
 
 
 class Home(models.Model):

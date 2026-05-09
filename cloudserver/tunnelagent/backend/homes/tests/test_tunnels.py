@@ -1,7 +1,7 @@
 import argparse
 
 from django.test import SimpleTestCase
-from external.tunnels.manage_tunnel import Config, TunnelManager
+from homes.tunnels.manage_tunnel import Config, TunnelManager
 import os
 import shutil
 from argparse import ArgumentParser
@@ -56,8 +56,6 @@ class TunnelManagerTest(SimpleTestCase):
     # test argument parser
 
     def test_arg_parser_missing_public_key(self):
-        # sudo python manage_tunnel.py add alice3 1 -p alice_public_key
-        # sudo python manage_tunnel.py remove alice4 1
         with self.assertRaises(ParserSeriousError):
             self.parser.parse_args(['add', 'tester', '1', '-p', 'missing_public_key'])
 
@@ -80,4 +78,3 @@ class TunnelManagerTest(SimpleTestCase):
 
         with self.assertRaises(ParserSeriousError):
             self.parser.parse_args(['add', 'otsakir#asdf', '15', '-p', 'authorized_keys'])
-
