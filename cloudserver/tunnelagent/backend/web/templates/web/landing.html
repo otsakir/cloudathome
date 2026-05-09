@@ -1,0 +1,21 @@
+{% extends "web/base.html" %}
+
+{% block title %}CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>CloudAtHome</h1>
+<p>
+  CloudAtHome lets you expose services running on your home network to the internet —
+  without opening firewall ports or using a VPN.
+</p>
+<p>
+  It works by establishing a secure SSH reverse tunnel from your home machine to a
+  cloud server. Incoming HTTPS requests are routed by hostname through the tunnel
+  directly to your home service.
+</p>
+<h2>Get started</h2>
+<ul>
+  <li><a href="{% url 'signup' %}">Create an account</a></li>
+  <li><a href="{% url 'login' %}">Log in</a></li>
+</ul>
+{% endblock %}

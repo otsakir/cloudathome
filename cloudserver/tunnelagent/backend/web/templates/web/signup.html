@@ -1,0 +1,37 @@
+{% extends "web/base.html" %}
+
+{% block title %}Sign up — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Create an account</h1>
+<p>
+  After signing up, an administrator will review and activate your account before
+  you can log in.
+</p>
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% if field.errors %}
+        <ul>
+          {% for error in field.errors %}
+            <li><strong>{{ error }}</strong></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    <br>
+  {% endfor %}
+  {% if form.non_field_errors %}
+    <ul>
+      {% for error in form.non_field_errors %}
+        <li><strong>{{ error }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <button type="submit">Sign up</button>
+</form>
+<p>Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+{% endblock %}

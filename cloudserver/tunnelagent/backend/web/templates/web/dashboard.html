@@ -1,0 +1,19 @@
+{% extends "web/base.html" %}
+
+{% block title %}Dashboard — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p>Welcome, {{ user.first_name|default:user.username }}.</p>
+
+<h2>Your home</h2>
+{% if home %}
+  <table>
+    <tr><th>Home index</th><td>{{ home.home_index }}</td></tr>
+    <tr><th>SSH username</th><td>{{ home.get_username }}</td></tr>
+    <tr><th>Port base</th><td>{{ home_port_base }}</td></tr>
+  </table>
+{% else %}
+  <p>No home registered yet.</p>
+{% endif %}
+{% endblock %}
