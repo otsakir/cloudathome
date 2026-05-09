@@ -64,27 +64,13 @@ The SQLite database file is mapped outside of of the container at `./cloudserver
 
 ### Provision home slots
 
-The system supports up to 10 home slots (indices 0–9). These records must exist in the database before any user can register a home. Create them once via the Django shell:
-
-```bash
-docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py shell -c "
-from homes.models import Home
-for i in range(10):
-    Home.objects.get_or_create(home_index=i)
-print('Home slots ready.')
-"
-```
+The system supports up to 10 home slots (indices 0–9). The data migration `homes/migrations/0003_provision_homes.py` creates them automatically when you run `migrate`, so no extra step is needed.
 
 ### Create application users
 
-Users register homes via the REST API, but their Django accounts must be created first. Use the Django admin UI at `http://localhost:8000/admin/` (log in as the superuser created above), or from the shell:
+Users can self-register at `http://localhost:8000/signup/`. New accounts are created inactive and must be approved by an administrator before login is allowed.
 
-```bash
-docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py shell -c "
-from django.contrib.auth.models import User
-User.objects.create_user('alice', password='changeme')
-"
-```
+To activate an account, go to the Django admin UI at `http://localhost:8000/admin/`, open the user, tick **Active**, and save.
 
 ### Administration
 
@@ -107,83 +93,83 @@ The following admin-only endpoints are also available (requires superuser sessio
 
 ---
 
-## Setting up a tunnel (walkthrough)
+## Home server
 
-This walkthrough uses `localhost` as the cloud server address (i.e. the stack is running locally via Docker Compose). Replace it with your actual cloud server hostname for a real deployment.
-
-### 1. Create a user
-
-The actual process to create a user for the cloudserver platform is not yet settled. We're assuming that you have a plain django user named `alice`.
-
-### 2. Register a home
-
-POST to `/api/homes/` while logged in as `alice`, passing your SSH public key to the body. Make sure to pass
-proper authentication headers, `sessionid` etc. accordingly:
+The `homeserver/` directory contains a minimal Docker Compose stack that simulates the home side: an nginx container serving a static "It works." page over HTTPS using a self-signed certificate. It is intended for local end-to-end testing.
 
 ```bash
-PKEY=$(cat ~/.ssh/id_rsa.pub)
-curl -s -X POST http://localhost:8000/api/homes/ \
-  -H "Content-Type: application/json" \
-  -b cookies.txt \
-  -d '{"public_key": "'$PKEY'"}'
+docker compose -f homeserver/compose.yaml up --build
 ```
 
-The response contains everything needed to connect:
+This starts nginx listening on `localhost:8443` (HTTPS). The self-signed certificate is generated at image build time, so there is no certificate file to manage.
 
-```json
-{
-  "name": "alice",
-  "ssh_username": "home00_alice",
-  "port_base": 2000,
-  "port_count": 10
-}
-```
+---
 
-### 3. Open the reverse SSH tunnel
+## End-to-end walkthrough
 
-From the home machine initiate a reverse port forwarding command. Map an internal port on the cloud server back to a 
-`host:port` at the local network of the home machine. Use `port_base` from the response of the previous step as the 
-remote port:
+This walkthrough runs both stacks on the same machine using `localhost` as the cloud address. Replace it with your actual cloud server hostname for a real deployment.
+
+### 1. Start both stacks
+
+In one terminal start the cloud stack:
 
 ```bash
-ssh -N -T -R 127.0.0.1:2000:127.0.0.1:2600 home00_alice@localhost -p 8022
+docker compose -f cloudserver/compose.yaml up --build
 ```
 
-This maps **port 2000 on the cloud server** → **port 2600 on the home machine**. The connection will appear to hang — that is correct; it is holding the tunnel open.
-
-### 4. Create a proxy mapping 
-
-Next, you need to create a proxy mapping. This entails creating the django `proxy-mapping` entity and the respective
-state in _haproxy_. Again, make sure you provide authorization information as this is a user-scoped operation.
-
-```
-    POST /api/proxy-mappings/ {
-      "host": "localhost",
-      "local_port": 200,
-      "scheme": "https",
-      "home": 1
-    }
-```
-
-### 5. Start a listening server 
-
-At your home machine, in a separate terminal, start a netcat listener on the local port used above (2600):
+In another terminal start the home server:
 
 ```bash
-nc -l -p 2600
+docker compose -f homeserver/compose.yaml up --build
 ```
 
-### 6. Make a request through the tunnel
+### 2. Sign up
 
-From the cloud server (or any machine with access to it), connect to the tunnel port:
+Go to `http://localhost:8000/signup/` and fill in the registration form. New accounts are created inactive.
+
+### 3. Activate the account (admin step)
+
+Log in to the Django admin at `http://localhost:8000/admin/` as the superuser. Open the new user, tick **Active**, and save.
+
+### 4. Log in
+
+Go to `http://localhost:8000/login/` and log in as alice. You are redirected to the dashboard at `http://localhost:8000/dashboard/`.
+
+### 5. Register a home
+
+From the dashboard, click **Register a home**. Paste your SSH public key (e.g. the contents of `~/.ssh/id_ed25519.pub`) into the form and submit.
+
+The dashboard now shows the assigned **SSH username** (e.g. `home00_alice`) and **port base** (e.g. `2000`). Keep these values — they are needed for the next step.
+
+### 6. Open the reverse SSH tunnel
+
+From the home machine (or a separate terminal when testing locally), forward the cloud-side tunnel port to the home nginx:
 
 ```bash
-curl https://localhost
+ssh -N -T -R 127.0.0.1:2000:localhost:8443 home00_alice@localhost -p 8022
 ```
 
-The request reaches haproxy, is reverse proxied to the internal port where the SSH tunnel 
-listens to, it travels through the SSH tunnel and arrives at the `nc` listener at the home machine. Anything typed
-into the `nc` terminal is sent back as the response.
+This maps **port 2000 on the cloud server** → **port 8443 on the home machine** (where nginx is listening). The command will appear to hang — that is correct; it is holding the tunnel open.
+
+### 7. Add a proxy mapping
+
+From the dashboard, click **Add mapping**. Fill in:
+
+- **Hostname** — the public domain name that HAProxy will match by SNI (e.g. `mysite.example.com`)
+- **Local port** — the tunnel port from step 5 (e.g. `2000`)
+- **Scheme** — `https`
+
+Submit the form. HAProxy's SNI map is updated immediately — no reload needed.
+
+### 8. Test the full path
+
+```bash
+curl -k --resolve mysite.example.com:443:127.0.0.1 https://mysite.example.com
+```
+
+The `-k` flag accepts the home server's self-signed certificate. `--resolve` injects the hostname into the TLS ClientHello without needing a DNS entry, so HAProxy can match it by SNI.
+
+You should see the "It works." page served by nginx on the home network.
 
 
 
