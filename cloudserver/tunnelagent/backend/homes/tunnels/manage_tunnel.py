@@ -197,9 +197,22 @@ class TunnelManager:
                                                                   'Use a proper POSIX username syntax.'))
         remove_parser.add_argument('home_id', type=get_home_type(self.config))
 
+        update_key_parser = subparsers.add_parser('update-key', help='Replace SSH public key for an existing tunnel user')
+        update_key_parser.add_argument('user_suffix', type=regex_type(f'^{self.config.USERNAME_SUFFIX_PATTERN}$',
+                                                                      'Use a proper POSIX username syntax.'))
+        update_key_parser.add_argument('home_id', type=get_home_type(self.config))
+        update_key_parser.add_argument('-p', '--public', type=get_public_key_file_type(self.config), help='public key temporary filename',
+                                       required=True)
+
         subparsers.add_parser('reload', help='Reload sshd configuration')
 
         return parser
+
+    def update_tunnel_user_key(self, username: str, public_key_filename: str):
+        dest = f'/home/{username}/.ssh/authorized_keys'
+        shutil.copy(f'{self.config.PUBLIC_KEY_STORAGE_PATH}/{public_key_filename}', dest)
+        os.chmod(dest, 0o600)
+        shutil.chown(dest, username, username)
 
     def enable_user(self, username: str):
         # echo "admin:*" | chpasswd -e && cd /home/admin
@@ -272,5 +285,8 @@ if __name__ == '__main__':
         tunnel_manager.drop_tunnel_user(username)
         tunnel_manager.remove_username_from_allow_users(username)
         tunnel_manager.remove_user_sshdconfig(username)
+    elif args.command == 'update-key':
+        username = tunnel_manager.make_username(args.home_id, args.user_suffix)
+        tunnel_manager.update_tunnel_user_key(username, args.public)
     elif args.command == 'reload':
         tunnel_manager.reload_sshd_config()
