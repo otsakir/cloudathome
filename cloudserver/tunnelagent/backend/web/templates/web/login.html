@@ -1,0 +1,33 @@
+{% extends "web/base.html" %}
+
+{% block title %}Log in — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Log in</h1>
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% if field.errors %}
+        <ul>
+          {% for error in field.errors %}
+            <li><strong>{{ error }}</strong></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    <br>
+  {% endfor %}
+  {% if form.non_field_errors %}
+    <ul>
+      {% for error in form.non_field_errors %}
+        <li><strong>{{ error }}</strong></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <button type="submit">Log in</button>
+</form>
+<p>Don't have an account? <a href="{% url 'signup' %}">Sign up</a></p>
+{% endblock %}

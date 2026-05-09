@@ -1,0 +1,12 @@
+{% extends "web/base.html" %}
+
+{% block title %}Account pending — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Account created</h1>
+<p>
+  Your account has been created and is pending administrator approval.
+  You will be able to log in once it has been activated.
+</p>
+<p><a href="{% url 'landing' %}">Back to home</a></p>
+{% endblock %}

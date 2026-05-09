@@ -34,6 +34,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'homes.apps.HomesConfig',
     'api.apps.ApiConfig',
+    'web.apps.WebConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -148,3 +149,7 @@ CAH_PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'
 HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'
 HAPROXY_API_PORT = 9999
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/'
