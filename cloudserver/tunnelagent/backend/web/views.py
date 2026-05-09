@@ -105,6 +105,35 @@ class RegisterHomeView(HomeOwnerMixin, FormView):
         return redirect('dashboard')
 
 
+class EditHomeView(HomeOwnerMixin, FormView):
+    template_name = 'web/edit_home.html'
+    form_class = RegisterHomeForm
+
+    def get_home(self):
+        return get_object_or_404(Home, user=self.request.user)
+
+    def get_initial(self):
+        return {'public_key': self.get_home().public_key}
+
+    def form_valid(self, form):
+        home = self.get_home()
+        try:
+            ElevatedOperations.update_home_user_key(
+                home.home_index,
+                self.request.user.username,
+                form.cleaned_data['public_key'],
+            )
+        except Exception:
+            messages.error(self.request, 'Failed to update public key.')
+            return redirect('dashboard')
+
+        home.public_key = form.cleaned_data['public_key']
+        home.save()
+
+        messages.success(self.request, 'Public key updated.')
+        return redirect('dashboard')
+
+
 class ReleaseHomeView(HomeOwnerMixin, TemplateView):
     template_name = 'web/release_home.html'
 

@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+
+{% block title %}Update public key — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Update SSH public key</h1>
+<p>Replace the public key associated with your home tunnel. Active sessions are not affected.</p>
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% for error in field.errors %}
+        <p><strong>{{ error }}</strong></p>
+      {% endfor %}
+    </div>
+    <br>
+  {% endfor %}
+  <button type="submit">Update key</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+{% endblock %}
