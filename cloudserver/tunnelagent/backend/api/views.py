@@ -4,7 +4,7 @@ import secrets
 from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.views import APIView
 from homes.models import ProxyMapping, Home
-from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer
+from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -27,6 +27,27 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
     def get_queryset(self):
         return Home.objects.filter(user=self.request.user)
+
+    @extend_schema(request=UpdateHomeKeySerializer, responses={200: OutHomeSerializer})
+    def patch(self, request, *args, **kwargs):
+        home = self.get_object()
+        s = UpdateHomeKeySerializer(data=request.data)
+        if not s.is_valid():
+            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            ElevatedOperations.update_home_user_key(
+                home.home_index,
+                home.user.username,
+                s.validated_data['public_key'],
+            )
+        except Exception:
+            return Response({'message': 'failed to update public key'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        home.public_key = s.validated_data['public_key']
+        home.save()
+
+        return Response(OutHomeSerializer(home).data)
 
     def destroy(self, request, *args, **kwargs):
         home = self.get_object()
@@ -134,9 +155,9 @@ class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(exclude=True)
 class ProxyInstanceAPIView(APIView):
     def get(self, request):
-        print('in ProxyInstance GET')
         pass
 
 
