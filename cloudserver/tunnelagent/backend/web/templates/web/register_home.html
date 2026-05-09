@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+
+{% block title %}Register home — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Register a home</h1>
+<p>Paste your SSH public key below. A home slot and tunnel port block will be assigned to you.</p>
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% for error in field.errors %}
+        <p><strong>{{ error }}</strong></p>
+      {% endfor %}
+    </div>
+    <br>
+  {% endfor %}
+  <button type="submit">Register</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+{% endblock %}

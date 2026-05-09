@@ -12,8 +12,40 @@
     <tr><th>Home index</th><td>{{ home.home_index }}</td></tr>
     <tr><th>SSH username</th><td>{{ home.get_username }}</td></tr>
     <tr><th>Port base</th><td>{{ home_port_base }}</td></tr>
+    <tr><th>Port count</th><td>10</td></tr>
   </table>
+  <p>
+    <a href="{% url 'add_mapping' %}">Add proxy mapping</a>
+    &nbsp;|&nbsp;
+    <a href="{% url 'release_home' %}">Release home</a>
+  </p>
+
+  <h2>Proxy mappings</h2>
+  {% if mappings %}
+    <table>
+      <thead>
+        <tr><th>Hostname</th><th>Local port</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for mapping in mappings %}
+          <tr>
+            <td>{{ mapping.host }}</td>
+            <td>{{ mapping.local_port }}</td>
+            <td>
+              <form method="post" action="{% url 'delete_mapping' mapping.host %}">
+                {% csrf_token %}
+                <button type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No proxy mappings yet.</p>
+  {% endif %}
+
 {% else %}
-  <p>No home registered yet.</p>
+  <p>No home registered yet. <a href="{% url 'register_home' %}">Register a home</a></p>
 {% endif %}
 {% endblock %}

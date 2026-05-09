@@ -1,7 +1,10 @@
 from django.contrib.auth.views import LogoutView
 from django.urls import path
 
-from web.views import LandingView, SignupView, SignupPendingView, LoginView, DashboardView
+from web.views import (
+    LandingView, SignupView, SignupPendingView, LoginView, DashboardView,
+    RegisterHomeView, ReleaseHomeView, AddMappingView, DeleteMappingView,
+)
 
 urlpatterns = [
     path('', LandingView.as_view(), name='landing'),
@@ -10,4 +13,8 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('home/register/', RegisterHomeView.as_view(), name='register_home'),
+    path('home/release/', ReleaseHomeView.as_view(), name='release_home'),
+    path('home/mappings/add/', AddMappingView.as_view(), name='add_mapping'),
+    path('home/mappings/<str:host>/delete/', DeleteMappingView.as_view(), name='delete_mapping'),
 ]
