@@ -37,6 +37,76 @@ The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
 - DRF login: http://localhost:8000/api-auth/login/
 
 
+## Running with Docker
+
+### Start the stack
+
+```bash
+docker compose -f cloudserver/compose.yaml up --build
+```
+
+This starts two services:
+- **haproxy** — listens on port 443 (HTTPS ingress)
+- **tunnelagent** — Django API on port 8000, SSH server on port 8022
+
+HAProxy must pass its health check before tunnelagent starts. On first run, the `tunnelagent/var/` directory is created automatically as a bind-mounted volume for the SQLite database.
+
+### First-time database setup
+
+Run migrations and create a superuser:
+
+```bash
+docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py migrate
+docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
+```
+
+The SQLite database file is mapped outside of of the container at `./cloudserver/tunnelagent/var/db.sqlite3`.
+
+### Provision home slots
+
+The system supports up to 10 home slots (indices 0–9). These records must exist in the database before any user can register a home. Create them once via the Django shell:
+
+```bash
+docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py shell -c "
+from homes.models import Home
+for i in range(10):
+    Home.objects.get_or_create(home_index=i)
+print('Home slots ready.')
+"
+```
+
+### Create application users
+
+Users register homes via the REST API, but their Django accounts must be created first. Use the Django admin UI at `http://localhost:8000/admin/` (log in as the superuser created above), or from the shell:
+
+```bash
+docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py shell -c "
+from django.contrib.auth.models import User
+User.objects.create_user('alice', password='changeme')
+"
+```
+
+### Administration
+
+
+#### Django administrator
+
+Once the stack is running, you can access the Django administrator at the link below.
+
+http://localhost:8000/admin/
+
+#### Administrative endpoints
+
+The following admin-only endpoints are also available (requires superuser session):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/proxy-mappings/sync` | Re-sync all DB mappings to HAProxy |
+| GET | `/api/admin/proxy-mappings/haproxy` | Dump current HAProxy SNI map |
+| POST | `/api/admin/homes/sync` | Reconcile DB homes with system SSH users |
+
+---
+
 ## Setting up a tunnel (walkthrough)
 
 This walkthrough uses `localhost` as the cloud server address (i.e. the stack is running locally via Docker Compose). Replace it with your actual cloud server hostname for a real deployment.

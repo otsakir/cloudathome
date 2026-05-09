@@ -3,7 +3,7 @@ import secrets
 
 from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
 from rest_framework.views import APIView
-from .models import ProxyMapping, Home
+from homes.models import ProxyMapping, Home
 from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer
 # from haproxyadmin.haproxy import HAProxy
 from django.http import HttpRequest
@@ -11,8 +11,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework import status
-from external.services import ElevatedOperations
-from external.services import HAProxyService
+from homes.services import ElevatedOperations
+from homes.services import HAProxyService
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -114,7 +114,7 @@ class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingSerializer
-    lookup_field = 'slug'
+    lookup_field = 'host'
 
     def get_queryset(self):
         return ProxyMapping.objects.filter(
@@ -171,7 +171,7 @@ class HomeSyncView(APIView):
 
     def post(self, request):
         import pwd
-        from external.services import ElevatedOperations as EO
+        from homes.services import ElevatedOperations as EO
 
         homes = list(Home.objects.filter(user__isnull=False).select_related('user'))
         reconciled = 0

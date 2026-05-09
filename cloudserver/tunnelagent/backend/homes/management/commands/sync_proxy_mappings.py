@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.db import OperationalError, ProgrammingError
 
-from api.models import ProxyMapping
-from external.services import HAProxyService
+from homes.models import ProxyMapping
+from homes.services import HAProxyService
 
 
 class Command(BaseCommand):

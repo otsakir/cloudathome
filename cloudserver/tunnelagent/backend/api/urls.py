@@ -5,7 +5,7 @@ from .views import ProxyMappingListCreateView, ProxyMappingDestroyAPIView, Proxy
 
 urlpatterns = [
     path('api/homes/<slug:home_slug>/proxy-mappings/', ProxyMappingListCreateView.as_view(), name='proxy-mappings'),
-    path('api/homes/<slug:home_slug>/proxy-mappings/<slug:slug>/', ProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
+    path('api/homes/<slug:home_slug>/proxy-mappings/<str:host>/', ProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
 
     path('api/proxy/instance/', ProxyInstanceAPIView.as_view(), name='proxy-instance'),
 
