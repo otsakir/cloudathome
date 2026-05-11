@@ -30,7 +30,7 @@ class HAProxyService:
 
     @classmethod
     def add_mapping(cls, mapping):
-        cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.local_port}')
+        cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.tunnel_port}')
 
     @classmethod
     def remove_mapping(cls, mapping):
@@ -40,7 +40,7 @@ class HAProxyService:
     def sync_mappings(cls, mappings):
         cls._send_command(f'clear map {MAP_FILE}')
         for mapping in mappings:
-            cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.local_port}')
+            cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.tunnel_port}')
 
     @classmethod
     def dump_mappings(cls):
