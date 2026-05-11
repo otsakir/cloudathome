@@ -1,9 +1,11 @@
 from django.urls import path
+from rest_framework.authtoken.views import obtain_auth_token
 from .views import ProxyMappingListCreateView, ProxyMappingDestroyAPIView, ProxyInstanceAPIView, \
     HomeRetrieveDestroyApiView, HomeListCreateAPIView, ProxyMappingSyncView, ProxyMappingDumpView, HomeSyncView
 
 
 urlpatterns = [
+    path('api/auth/authtoken/', obtain_auth_token, name='api-token-auth'),
     path('api/homes/<slug:home_slug>/proxy-mappings/', ProxyMappingListCreateView.as_view(), name='proxy-mappings'),
     path('api/homes/<slug:home_slug>/proxy-mappings/<str:host>/', ProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
 

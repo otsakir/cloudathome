@@ -7,7 +7,8 @@ from django.conf import settings
 from backend.settings import CAH_PUBLIC_KEY_STORAGE_PATH
 
 
-MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
+SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
+HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
 
 
 class HAProxyService:
@@ -29,27 +30,38 @@ class HAProxyService:
         return b''.join(chunks).decode()
 
     @classmethod
+    def _map_file_and_backend(cls, mapping):
+        if mapping.scheme == 'https':
+            return SNI_MAP_FILE, f'tunnel_{mapping.tunnel_port}'
+        return HTTP_MAP_FILE, f'http_tunnel_{mapping.tunnel_port}'
+
+    @classmethod
     def add_mapping(cls, mapping):
-        cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.tunnel_port}')
+        map_file, backend = cls._map_file_and_backend(mapping)
+        cls._send_command(f'add map {map_file} {mapping.host} {backend}')
 
     @classmethod
     def remove_mapping(cls, mapping):
-        cls._send_command(f'del map {MAP_FILE} {mapping.host}')
+        map_file, _ = cls._map_file_and_backend(mapping)
+        cls._send_command(f'del map {map_file} {mapping.host}')
 
     @classmethod
     def sync_mappings(cls, mappings):
-        cls._send_command(f'clear map {MAP_FILE}')
+        cls._send_command(f'clear map {SNI_MAP_FILE}')
+        cls._send_command(f'clear map {HTTP_MAP_FILE}')
         for mapping in mappings:
-            cls._send_command(f'add map {MAP_FILE} {mapping.host} tunnel_{mapping.tunnel_port}')
+            map_file, backend = cls._map_file_and_backend(mapping)
+            cls._send_command(f'add map {map_file} {mapping.host} {backend}')
 
     @classmethod
     def dump_mappings(cls):
-        output = cls._send_command(f'show map {MAP_FILE}')
         entries = []
-        for line in output.splitlines():
-            parts = line.split()
-            if len(parts) == 3:
-                entries.append({'host': parts[1], 'backend': parts[2]})
+        for map_file in (SNI_MAP_FILE, HTTP_MAP_FILE):
+            output = cls._send_command(f'show map {map_file}')
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) == 3:
+                    entries.append({'host': parts[1], 'backend': parts[2]})
         return entries
 
 
