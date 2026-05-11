@@ -1,0 +1,46 @@
+from django.db import models
+
+
+class Domain(models.Model):
+    CERT_PENDING = 'pending'
+    CERT_VALID = 'valid'
+    CERT_EXPIRED = 'expired'
+    CERT_STATUS_CHOICES = [
+        (CERT_PENDING, 'Pending'),
+        (CERT_VALID, 'Valid'),
+        (CERT_EXPIRED, 'Expired'),
+    ]
+
+    name = models.CharField(max_length=253, unique=True)
+    cert_status = models.CharField(max_length=10, choices=CERT_STATUS_CHOICES, default=CERT_PENDING)
+    cert_expiry = models.DateTimeField(null=True, blank=True)
+    cert_path = models.CharField(max_length=512, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class ProxyEntry(models.Model):
+    SCHEME_HTTP = 'http'
+    SCHEME_HTTPS = 'https'
+    SCHEME_CHOICES = [(SCHEME_HTTP, 'HTTP'), (SCHEME_HTTPS, 'HTTPS')]
+
+    TUNNEL_CLOSED = 'closed'
+    TUNNEL_OPEN = 'open'
+    TUNNEL_ERROR = 'error'
+    TUNNEL_STATUS_CHOICES = [
+        (TUNNEL_CLOSED, 'Closed'),
+        (TUNNEL_OPEN, 'Open'),
+        (TUNNEL_ERROR, 'Error'),
+    ]
+
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='proxy_entries')
+    cloudserver_host = models.CharField(max_length=253, unique=True)
+    tunnel_port = models.IntegerField()
+    home_port = models.IntegerField()
+    scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
+    tunnel_pid = models.IntegerField(null=True, blank=True)
+    tunnel_status = models.CharField(max_length=6, choices=TUNNEL_STATUS_CHOICES, default=TUNNEL_CLOSED)
+
+    def __str__(self):
+        return f'{self.cloudserver_host} → :{self.home_port} ({self.scheme})'
