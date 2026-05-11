@@ -10,11 +10,6 @@ class ProxyMappingSerializer(serializers.ModelSerializer):
         fields = ['id', 'host', 'tunnel_port', 'scheme']
         read_only_fields = ['id']
 
-    def validate_scheme(self, value):
-        if value != ProxyMapping.SCHEME_HTTPS:
-            raise serializers.ValidationError('Only https is supported.')
-        return value
-
     def validate(self, data):
         home = self.context['home']
         tunnel_port = data['tunnel_port']

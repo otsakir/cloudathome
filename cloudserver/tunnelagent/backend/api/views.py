@@ -13,14 +13,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from homes.services import ElevatedOperations
 from homes.services import HAProxyService
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 
 
 class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OutHomeSerializer
     lookup_field = 'slug'
@@ -66,7 +66,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
 
 class HomeListCreateAPIView(ListCreateAPIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OutHomeSerializer
 
@@ -104,7 +104,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
 
 
 class ProxyMappingListCreateView(ListCreateAPIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingSerializer
 
@@ -132,7 +132,7 @@ class ProxyMappingListCreateView(ListCreateAPIView):
 
 
 class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingSerializer
     lookup_field = 'host'
@@ -162,7 +162,7 @@ class ProxyInstanceAPIView(APIView):
 
 
 class ProxyMappingSyncView(APIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAdminUser]
 
     def post(self, request):
@@ -175,7 +175,7 @@ class ProxyMappingSyncView(APIView):
 
 
 class ProxyMappingDumpView(APIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAdminUser]
 
     def get(self, request):
@@ -187,7 +187,7 @@ class ProxyMappingDumpView(APIView):
 
 
 class HomeSyncView(APIView):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAdminUser]
 
     def post(self, request):

@@ -6,8 +6,9 @@ from homes.tunnels.manage_tunnel import tunnel_manager
 
 
 class ProxyMapping(models.Model):
+    SCHEME_HTTP = 'http'
     SCHEME_HTTPS = 'https'
-    SCHEME_CHOICES = [(SCHEME_HTTPS, 'HTTPS')]
+    SCHEME_CHOICES = [(SCHEME_HTTP, 'HTTP'), (SCHEME_HTTPS, 'HTTPS')]
 
     home = models.ForeignKey('Home', on_delete=models.CASCADE, related_name='proxy_mappings')
     host = models.CharField(max_length=253, unique=True)
