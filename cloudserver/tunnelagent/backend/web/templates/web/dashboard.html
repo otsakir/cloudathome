@@ -32,7 +32,7 @@
         {% for mapping in mappings %}
           <tr>
             <td>{{ mapping.host }}</td>
-            <td>{{ mapping.local_port }}</td>
+            <td>{{ mapping.tunnel_port }}</td>
             <td>
               <form method="post" action="{% url 'delete_mapping' mapping.host %}">
                 {% csrf_token %}

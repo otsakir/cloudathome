@@ -185,7 +185,7 @@ class AddMappingView(HomeOwnerMixin, FormView):
         mapping = ProxyMapping.objects.create(
             home=home,
             host=form.cleaned_data['host'],
-            local_port=form.cleaned_data['local_port'],
+            tunnel_port=form.cleaned_data['tunnel_port'],
         )
         try:
             HAProxyService.add_mapping(mapping)

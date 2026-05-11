@@ -7,7 +7,7 @@ from homes.tunnels.manage_tunnel import tunnel_manager
 class ProxyMappingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProxyMapping
-        fields = ['id', 'host', 'local_port', 'scheme']
+        fields = ['id', 'host', 'tunnel_port', 'scheme']
         read_only_fields = ['id']
 
     def validate_scheme(self, value):
@@ -17,12 +17,12 @@ class ProxyMappingSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         home = self.context['home']
-        local_port = data['local_port']
+        tunnel_port = data['tunnel_port']
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME - 1
-        if not (port_base <= local_port <= port_max):
+        if not (port_base <= tunnel_port <= port_max):
             raise serializers.ValidationError({
-                'local_port': f'Must be in range {port_base}–{port_max} for home {home.home_index}.'
+                'tunnel_port': f'Must be in range {port_base}–{port_max} for home {home.home_index}.'
             })
         return data
 

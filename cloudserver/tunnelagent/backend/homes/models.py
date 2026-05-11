@@ -11,7 +11,7 @@ class ProxyMapping(models.Model):
 
     home = models.ForeignKey('Home', on_delete=models.CASCADE, related_name='proxy_mappings')
     host = models.CharField(max_length=253, unique=True)
-    local_port = models.IntegerField()
+    tunnel_port = models.IntegerField()
     scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
 
 

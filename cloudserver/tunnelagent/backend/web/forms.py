@@ -43,7 +43,7 @@ class RegisterHomeForm(forms.Form):
 
 class AddMappingForm(forms.Form):
     host = forms.CharField(max_length=253, label='Hostname')
-    local_port = forms.IntegerField(label='Local port')
+    tunnel_port = forms.IntegerField(label='Local port')
 
     def __init__(self, *args, home=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -55,8 +55,8 @@ class AddMappingForm(forms.Form):
             raise forms.ValidationError('A mapping for this hostname already exists.')
         return host
 
-    def clean_local_port(self):
-        port = self.cleaned_data['local_port']
+    def clean_tunnel_port(self):
+        port = self.cleaned_data['tunnel_port']
         if self.home:
             port_base = tunnel_manager.get_home_port_base(self.home.home_index)
             port_max = port_base + tunnel_manager.config.PORTS_PER_HOME - 1
