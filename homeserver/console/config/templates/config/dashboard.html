@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Console Dashboard</title></head>
+<body>
+<h1>CloudAtHome Console</h1>
+
+<h2>Cloud connection</h2>
+<table>
+  <tr><th>CloudServer URL</th><td>{{ config.cloudserver_url }}</td></tr>
+  <tr><th>Home slug</th><td>{{ config.home_slug }}</td></tr>
+  <tr><th>SSH username</th><td>{{ config.ssh_username }}</td></tr>
+  <tr><th>SSH host</th><td>{{ config.ssh_host }}:{{ config.ssh_port }}</td></tr>
+  <tr><th>Port range</th><td>{{ config.port_base }} – {{ config.port_base|add:config.port_count|add:"-1" }}</td></tr>
+</table>
+
+<h2>Domains</h2>
+{% if domains %}
+  <table>
+    <thead><tr><th>Name</th><th>Cert status</th><th>Expiry</th></tr></thead>
+    <tbody>
+      {% for domain in domains %}
+        <tr>
+          <td>{{ domain.name }}</td>
+          <td>{{ domain.cert_status }}</td>
+          <td>{{ domain.cert_expiry|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No domains yet.</p>
+{% endif %}
+</body>
+</html>

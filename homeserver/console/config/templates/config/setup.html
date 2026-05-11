@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Console Setup</title></head>
+<body>
+<h1>CloudAtHome Console — Setup</h1>
+
+{% if form.non_field_errors %}
+  <ul>
+    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <button type="submit">Register</button>
+</form>
+</body>
+</html>
