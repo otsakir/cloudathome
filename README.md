@@ -68,7 +68,7 @@ The system supports up to 10 home slots (indices 0–9). The data migration `hom
 
 ### Create application users
 
-Users can self-register at `http://localhost:8000/signup/`. New accounts are created inactive and must be approved by an administrator before login is allowed.
+Users can self-register at `http://localhost:8000/signup/`. New accounts are created **inactive** and must be approved by an administrator before login is allowed.
 
 To activate an account, go to the Django admin UI at `http://localhost:8000/admin/`, open the user, tick **Active**, and save.
 

@@ -10,6 +10,7 @@
     <a href="{% url 'landing' %}">Home</a>
     {% if user.is_authenticated %}
       | <a href="{% url 'dashboard' %}">Dashboard</a>
+      | <strong>{{ user.username }}</strong>
       | <form method="post" action="{% url 'logout' %}" style="display:inline">
           {% csrf_token %}
           <button type="submit">Log out</button>
