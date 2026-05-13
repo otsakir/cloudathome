@@ -42,25 +42,25 @@ The ProxyAgent REST API is browsable via Swagger UI when running in debug mode:
 ### Start the stack
 
 ```bash
-docker compose -f cloudserver/compose.yaml up --build
+docker compose -f cloud/compose.yaml up --build
 ```
 
 This starts two services:
 - **haproxy** — listens on port 443 (HTTPS ingress)
-- **tunnelagent** — Django API on port 8000, SSH server on port 8022
+- **django** — Django API on port 8000, SSH server on port 8022
 
-HAProxy must pass its health check before tunnelagent starts. On first run, the `tunnelagent/var/` directory is created automatically as a bind-mounted volume for the SQLite database.
+HAProxy must pass its health check before django starts. On first run, the `django/var/` directory is created automatically as a bind-mounted volume for the SQLite database.
 
 ### First-time database setup
 
 Run migrations and create a superuser:
 
 ```bash
-docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py migrate
-docker compose -f cloudserver/compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
+docker compose -f cloud/compose.yaml exec django python /opt/app/manage.py migrate
+docker compose -f cloud/compose.yaml exec django python /opt/app/manage.py createsuperuser
 ```
 
-The SQLite database file is mapped outside of of the container at `./cloudserver/tunnelagent/var/db.sqlite3`.
+The SQLite database file is mapped outside of of the container at `./cloud/django/var/db.sqlite3`.
 
 ### Provision home slots
 
@@ -95,10 +95,10 @@ The following admin-only endpoints are also available (requires superuser sessio
 
 ## Home server
 
-The `homeserver/` directory contains a minimal Docker Compose stack that simulates the home side: an nginx container serving a static "It works." page over HTTPS using a self-signed certificate. It is intended for local end-to-end testing.
+The `home/` directory contains a minimal Docker Compose stack that simulates the home side: an nginx container serving a static "It works." page over HTTPS using a self-signed certificate. It is intended for local end-to-end testing.
 
 ```bash
-docker compose -f homeserver/compose.yaml up --build
+docker compose -f home/compose.yaml up --build
 ```
 
 This starts nginx listening on `localhost:8443` (HTTPS). The self-signed certificate is generated at image build time, so there is no certificate file to manage.
@@ -114,13 +114,13 @@ This walkthrough runs both stacks on the same machine using `localhost` as the c
 In one terminal start the cloud stack:
 
 ```bash
-docker compose -f cloudserver/compose.yaml up --build
+docker compose -f cloud/compose.yaml up --build
 ```
 
 In another terminal start the home server:
 
 ```bash
-docker compose -f homeserver/compose.yaml up --build
+docker compose -f home/compose.yaml up --build
 ```
 
 ### 2. Sign up
