@@ -15,6 +15,9 @@ class ProxyMapping(models.Model):
     tunnel_port = models.IntegerField()
     scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
 
+    def __str__(self):
+        return f'{self.host} -> {self.home.get_username}'
+
 
 class Home(models.Model):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name='homes')
@@ -23,7 +26,7 @@ class Home(models.Model):
     slug = models.CharField(max_length=32, unique=True, null=True, blank=True)
 
     def __str__(self):
-        return f'Home {self.home_index}: user: {self.user},  ssh_username: {self.get_username}'
+        return f'Home {self.home_index} - ssh_username: {self.get_username}'
 
     @property
     def get_username(self):

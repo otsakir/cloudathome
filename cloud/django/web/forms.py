@@ -43,7 +43,8 @@ class RegisterHomeForm(forms.Form):
 
 class AddMappingForm(forms.Form):
     host = forms.CharField(max_length=253, label='Hostname')
-    tunnel_port = forms.IntegerField(label='Local port')
+    tunnel_port = forms.IntegerField(label='Tunnel port')
+    scheme = forms.ChoiceField(choices=ProxyMapping.SCHEME_CHOICES, label='Scheme')
 
     def __init__(self, *args, home=None, **kwargs):
         super().__init__(*args, **kwargs)

@@ -64,6 +64,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         home = Home.objects.filter(user=self.request.user).first()
         context['home'] = home
+        context['ssh_host'] = self.request.get_host().split(':')[0]
         if home:
             context['home_port_base'] = tunnel_manager.get_home_port_base(home.home_index)
             context['mappings'] = ProxyMapping.objects.filter(home=home)
@@ -186,6 +187,7 @@ class AddMappingView(HomeOwnerMixin, FormView):
             home=home,
             host=form.cleaned_data['host'],
             tunnel_port=form.cleaned_data['tunnel_port'],
+            scheme=form.cleaned_data['scheme'],
         )
         try:
             HAProxyService.add_mapping(mapping)

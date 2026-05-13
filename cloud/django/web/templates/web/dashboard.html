@@ -26,13 +26,17 @@
   {% if mappings %}
     <table>
       <thead>
-        <tr><th>Hostname</th><th>Local port</th><th></th></tr>
+        <tr><th>Hostname</th><th>Tunnel port</th><th>Scheme</th><th>SSH command (run on home machine)</th><th></th></tr>
       </thead>
       <tbody>
         {% for mapping in mappings %}
           <tr>
             <td>{{ mapping.host }}</td>
             <td>{{ mapping.tunnel_port }}</td>
+            <td>{{ mapping.scheme }}</td>
+            <td>
+              <code>ssh -N -R {{ mapping.tunnel_port }}:localhost:{% if mapping.scheme == 'https' %}443{% else %}80{% endif %} {{ home.get_username }}@{{ ssh_host }} -p 22</code>
+            </td>
             <td>
               <form method="post" action="{% url 'delete_mapping' mapping.host %}">
                 {% csrf_token %}
