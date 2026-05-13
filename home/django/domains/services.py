@@ -1,7 +1,12 @@
 import datetime
+import os
+import signal
 import subprocess
 
 import docker
+
+from cloudlink.models import CloudConfig
+from cloudlink.services import CloudServerClient
 
 
 class CertbotError(Exception):
@@ -58,3 +63,86 @@ class CertbotService:
             )
         except Exception:
             return None
+
+
+class TunnelService:
+
+    @staticmethod
+    def open_tunnel(tunnel_port, home_port):
+        config = CloudConfig.get()
+        proc = subprocess.Popen([
+            'ssh', '-N',
+            '-R', f'{tunnel_port}:localhost:{home_port}',
+            '-i', str(config.private_key_path),
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'ServerAliveInterval=30',
+            '-o', 'ExitOnForwardFailure=yes',
+            '-p', str(config.ssh_port),
+            f'{config.ssh_username}@{config.ssh_host}',
+        ])
+        return proc.pid
+
+    @staticmethod
+    def close_tunnel(pid):
+        os.kill(pid, signal.SIGTERM)
+
+
+class OrchestratorError(Exception):
+    pass
+
+
+class DomainOrchestrator:
+
+    @staticmethod
+    def allocate_tunnel_port():
+        from domains.models import ProxyEntry
+        config = CloudConfig.get()
+        used = set(ProxyEntry.objects.values_list('tunnel_port', flat=True))
+        try:
+            return next(
+                p for p in range(config.port_base, config.port_base + config.port_count)
+                if p not in used
+            )
+        except StopIteration:
+            raise OrchestratorError('No free tunnel ports available')
+
+    @staticmethod
+    def add_domain(name, email, cert_output_path):
+        from domains.models import Domain, ProxyEntry
+
+        tunnel_port = DomainOrchestrator.allocate_tunnel_port()
+        domain, _ = Domain.objects.get_or_create(name=name)
+        entry = ProxyEntry.objects.create(
+            domain=domain,
+            cloudserver_host=name,
+            tunnel_port=tunnel_port,
+            home_port=80,
+            scheme=ProxyEntry.SCHEME_HTTP,
+        )
+        client = CloudServerClient()
+        cert_paths = None
+        try:
+            client.create_proxy_mapping(name, tunnel_port, 'http')
+            pid = TunnelService.open_tunnel(tunnel_port, 80)
+            entry.tunnel_pid = pid
+            entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
+            entry.save()
+            cert_paths = CertbotService.issue_certificate(name, email, cert_output_path)
+        finally:
+            if entry.tunnel_pid:
+                try:
+                    TunnelService.close_tunnel(entry.tunnel_pid)
+                except Exception:
+                    pass
+            try:
+                client.delete_proxy_mapping(name)
+            except Exception:
+                pass
+            entry.delete()
+
+        expiry = CertbotService.check_certificate(name, cert_paths['cert'])
+        domain.cert_status = Domain.CERT_VALID
+        domain.cert_expiry = expiry
+        domain.cert_path = cert_paths['cert']
+        domain.save()
+        return domain

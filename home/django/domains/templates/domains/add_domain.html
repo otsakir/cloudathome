@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Add domain</title></head>
+<body>
+<h1>Add domain</h1>
+<p><a href="{% url 'domain_list' %}">Back to domains</a></p>
+
+<p>This will obtain a Let's Encrypt certificate for the domain via an HTTP-01 ACME challenge.
+An SSH tunnel and temporary cloud proxy mapping will be created automatically and removed once
+the certificate is issued.</p>
+
+{% if form.non_field_errors %}
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <button type="submit">Obtain certificate</button>
+</form>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{ object.name }}</title></head>
+<body>
+<h1>{{ object.name }}</h1>
+<p>
+  <a href="{% url 'domain_list' %}">Back to domains</a> |
+  <a href="{% url 'delete_domain' object.pk %}">Delete domain</a>
+</p>
+
+<h2>Certificate</h2>
+<table>
+  <tr><th>Status</th><td>{{ object.cert_status }}</td></tr>
+  <tr><th>Expiry</th><td>{{ object.cert_expiry|default:"—" }}</td></tr>
+  <tr><th>Path</th><td>{{ object.cert_path|default:"—" }}</td></tr>
+</table>
+
+<h2>Proxy entries</h2>
+<p><a href="{% url 'add_proxy_entry' object.pk %}">Add HTTPS proxy entry</a></p>
+
+{% if object.proxy_entries.all %}
+  <table>
+    <thead>
+      <tr>
+        <th>Host</th><th>Tunnel port</th><th>Home port</th><th>Scheme</th>
+        <th>Tunnel</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in object.proxy_entries.all %}
+        <tr>
+          <td>{{ entry.cloudserver_host }}</td>
+          <td>{{ entry.tunnel_port }}</td>
+          <td>{{ entry.home_port }}</td>
+          <td>{{ entry.scheme }}</td>
+          <td>{{ entry.tunnel_status }}</td>
+          <td>
+            <form method="post" action="{% url 'tunnel_toggle' entry.pk %}">
+              {% csrf_token %}
+              {% if entry.tunnel_status == 'open' %}
+                <button type="submit">Close tunnel</button>
+              {% else %}
+                <button type="submit">Open tunnel</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No proxy entries yet.</p>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>Delete {{ domain.name }}</title></head>
+<body>
+<h1>Delete {{ domain.name }}</h1>
+<p>This will close all open tunnels, remove all cloud proxy mappings, and delete the domain
+and its proxy entries. The certificate files on disk will not be removed.</p>
+
+<form method="post">
+  {% csrf_token %}
+  <button type="submit">Confirm delete</button>
+  <a href="{% url 'domain_detail' domain.pk %}">Cancel</a>
+</form>
+</body>
+</html>
