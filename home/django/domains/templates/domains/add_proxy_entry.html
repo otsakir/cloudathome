@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>Add proxy entry — {{ domain.name }}</title></head>
+<body>
+<h1>Add HTTPS proxy entry for {{ domain.name }}</h1>
+<p><a href="{% url 'domain_detail' domain.pk %}">Back to {{ domain.name }}</a></p>
+
+<p>Creates a cloud proxy mapping and a local database record. Open the tunnel separately
+after creation.</p>
+
+{% if form.non_field_errors %}
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <button type="submit">Create</button>
+</form>
+</body>
+</html>

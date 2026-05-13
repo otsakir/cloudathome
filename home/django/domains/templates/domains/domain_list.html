@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head><title>Domains</title></head>
+<body>
+<h1>Domains</h1>
+<p><a href="{% url 'add_domain' %}">Add domain</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
+
+{% if domains %}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Cert status</th><th>Expiry</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for domain in domains %}
+        <tr>
+          <td><a href="{% url 'domain_detail' domain.pk %}">{{ domain.name }}</a></td>
+          <td>{{ domain.cert_status }}</td>
+          <td>{{ domain.cert_expiry|default:"—" }}</td>
+          <td><a href="{% url 'delete_domain' domain.pk %}">Delete</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No domains yet.</p>
+{% endif %}
+</body>
+</html>
