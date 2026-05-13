@@ -47,17 +47,17 @@ docker compose -f cloud/compose.yaml up --build
 
 This starts two services:
 - **haproxy** — listens on port 443 (HTTPS ingress)
-- **django** — Django API on port 8000, SSH server on port 8022
+- **tunnelagent** — Django API on port 8000, SSH server on port 8022
 
-HAProxy must pass its health check before django starts. On first run, the `django/var/` directory is created automatically as a bind-mounted volume for the SQLite database.
+HAProxy must pass its health check before tunnelagent starts. On first run, the `django/var/` directory is created automatically as a bind-mounted volume for the SQLite database.
 
 ### First-time database setup
 
 Run migrations and create a superuser:
 
 ```bash
-docker compose -f cloud/compose.yaml exec django python /opt/app/manage.py migrate
-docker compose -f cloud/compose.yaml exec django python /opt/app/manage.py createsuperuser
+docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py migrate
+docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
 ```
 
 The SQLite database file is mapped outside of of the container at `./cloud/django/var/db.sqlite3`.

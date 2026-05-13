@@ -15,7 +15,7 @@ All services run via Docker Compose from the `cloud/` directory:
 docker compose -f cloud/compose.yaml up --build
 
 # Start individual services
-docker compose -f cloud/compose.yaml up django
+docker compose -f cloud/compose.yaml up tunnelagent
 docker compose -f cloud/compose.yaml up haproxy
 ```
 
