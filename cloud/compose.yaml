@@ -19,7 +19,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
 
-  django:
+  tunnelagent:
     build:
       context: .
       dockerfile: django.dockerfile
