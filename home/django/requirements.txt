@@ -1,3 +1,4 @@
 Django>=5.2
 requests
 docker
+pyyaml

@@ -15,10 +15,10 @@
   <tr><th>Path</th><td>{{ object.cert_path|default:"—" }}</td></tr>
 </table>
 
-<h2>Proxy entries</h2>
-<p><a href="{% url 'add_proxy_entry' object.pk %}">Add HTTPS proxy entry</a></p>
+<h2>Proxy entry</h2>
 
-{% if object.proxy_entries.all %}
+{% if object.proxy_entry %}
+  {% with entry=object.proxy_entry %}
   <table>
     <thead>
       <tr>
@@ -27,29 +27,28 @@
       </tr>
     </thead>
     <tbody>
-      {% for entry in object.proxy_entries.all %}
-        <tr>
-          <td>{{ entry.cloudserver_host }}</td>
-          <td>{{ entry.tunnel_port }}</td>
-          <td>{{ entry.home_port }}</td>
-          <td>{{ entry.scheme }}</td>
-          <td>{{ entry.tunnel_status }}</td>
-          <td>
-            <form method="post" action="{% url 'tunnel_toggle' entry.pk %}">
-              {% csrf_token %}
-              {% if entry.tunnel_status == 'open' %}
-                <button type="submit">Close tunnel</button>
-              {% else %}
-                <button type="submit">Open tunnel</button>
-              {% endif %}
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
+      <tr>
+        <td>{{ entry.cloudserver_host }}</td>
+        <td>{{ entry.tunnel_port }}</td>
+        <td>{{ entry.home_port }}</td>
+        <td>{{ entry.scheme }}</td>
+        <td>{{ entry.tunnel_status }}</td>
+        <td>
+          <form method="post" action="{% url 'tunnel_toggle' entry.pk %}">
+            {% csrf_token %}
+            {% if entry.tunnel_status == 'open' %}
+              <button type="submit">Close tunnel</button>
+            {% else %}
+              <button type="submit">Open tunnel</button>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
     </tbody>
   </table>
+  {% endwith %}
 {% else %}
-  <p>No proxy entries yet.</p>
+  <p>No proxy entry yet. <a href="{% url 'add_proxy_entry' object.pk %}">Add one.</a></p>
 {% endif %}
 </body>
 </html>

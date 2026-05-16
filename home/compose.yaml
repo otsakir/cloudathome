@@ -1,7 +1,0 @@
-services:
-  nginx:
-    build:
-      context: .
-      dockerfile: nginx.dockerfile
-    ports:
-      - "8443:443"

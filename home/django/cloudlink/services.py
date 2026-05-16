@@ -1,5 +1,6 @@
 import requests
-from .models import CloudConfig
+
+from cloudlink.config import get_config
 
 
 class CloudServerError(Exception):
@@ -7,20 +8,12 @@ class CloudServerError(Exception):
 
 
 class CloudServerClient:
-    def __init__(self, config: CloudConfig = None):
-        self._config = config
-
-    @property
-    def config(self):
-        if self._config is None:
-            self._config = CloudConfig.get()
-        return self._config
 
     def _headers(self):
-        return {'Authorization': f'Token {self.config.auth_token}'}
+        return {'Authorization': f'Token {get_config().auth_token}'}
 
     def _url(self, path):
-        return f'{self.config.cloudserver_url.rstrip("/")}/{path.lstrip("/")}'
+        return f'{get_config().cloudserver_url.rstrip("/")}/{path.lstrip("/")}'
 
     def get_home(self):
         resp = requests.get(self._url('/api/homes/'), headers=self._headers())
@@ -33,7 +26,7 @@ class CloudServerClient:
 
     def create_proxy_mapping(self, host, tunnel_port, scheme):
         resp = requests.post(
-            self._url(f'/api/homes/{self.config.home_slug}/proxy-mappings/'),
+            self._url(f'/api/homes/{get_config().home_slug}/proxy-mappings/'),
             headers=self._headers(),
             json={'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme},
         )
@@ -43,7 +36,7 @@ class CloudServerClient:
 
     def delete_proxy_mapping(self, host):
         resp = requests.delete(
-            self._url(f'/api/homes/{self.config.home_slug}/proxy-mappings/{host}/'),
+            self._url(f'/api/homes/{get_config().home_slug}/proxy-mappings/{host}/'),
             headers=self._headers(),
         )
         if resp.status_code != 204:

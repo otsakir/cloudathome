@@ -5,7 +5,7 @@ import subprocess
 
 import docker
 
-from cloudlink.models import CloudConfig
+from cloudlink.config import get_config
 from cloudlink.services import CloudServerClient
 
 
@@ -69,16 +69,16 @@ class TunnelService:
 
     @staticmethod
     def open_tunnel(tunnel_port, home_port):
-        config = CloudConfig.get()
+        cfg = get_config()
         proc = subprocess.Popen([
             'ssh', '-N',
             '-R', f'{tunnel_port}:localhost:{home_port}',
-            '-i', str(config.private_key_path),
+            '-i', str(cfg.ssh.private_key_path),
             '-o', 'StrictHostKeyChecking=accept-new',
             '-o', 'ServerAliveInterval=30',
             '-o', 'ExitOnForwardFailure=yes',
-            '-p', str(config.ssh_port),
-            f'{config.ssh_username}@{config.ssh_host}',
+            '-p', str(cfg.ssh.port),
+            f'{cfg.ssh.username}@{cfg.ssh.host}',
         ])
         return proc.pid
 
@@ -96,11 +96,11 @@ class DomainOrchestrator:
     @staticmethod
     def allocate_tunnel_port():
         from domains.models import ProxyEntry
-        config = CloudConfig.get()
+        cfg = get_config()
         used = set(ProxyEntry.objects.values_list('tunnel_port', flat=True))
         try:
             return next(
-                p for p in range(config.port_base, config.port_base + config.port_count)
+                p for p in range(cfg.port_base, cfg.port_base + cfg.port_count)
                 if p not in used
             )
         except StopIteration:
@@ -110,6 +110,7 @@ class DomainOrchestrator:
     def add_domain(name, email, cert_output_path):
         from domains.models import Domain, ProxyEntry
 
+        # create home-side objects
         tunnel_port = DomainOrchestrator.allocate_tunnel_port()
         domain, _ = Domain.objects.get_or_create(name=name)
         entry = ProxyEntry.objects.create(
