@@ -8,8 +8,8 @@
 <table>
   <tr><th>CloudServer URL</th><td>{{ config.cloudserver_url }}</td></tr>
   <tr><th>Home slug</th><td>{{ config.home_slug }}</td></tr>
-  <tr><th>SSH username</th><td>{{ config.ssh_username }}</td></tr>
-  <tr><th>SSH host</th><td>{{ config.ssh_host }}:{{ config.ssh_port }}</td></tr>
+  <tr><th>SSH username</th><td>{{ config.ssh.username }}</td></tr>
+  <tr><th>SSH host</th><td>{{ config.ssh.host }}:{{ config.ssh.port }}</td></tr>
   <tr><th>Port range</th><td>{{ config.port_base }} – {{ config.port_base|add:config.port_count|add:"-1" }}</td></tr>
 </table>
 

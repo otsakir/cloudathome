@@ -21,6 +21,12 @@ class Domain(models.Model):
 
 
 class ProxyEntry(models.Model):
+    """
+    Holds information about a tunnel including dynamic properties. Tunnel ports (cloud side and home side), entry
+    point hostname (cloudserver_host) and scheme (http/https). When the ssh tunnel is in place it also contains the pid
+    of the ssh process.
+
+    """
     SCHEME_HTTP = 'http'
     SCHEME_HTTPS = 'https'
     SCHEME_CHOICES = [(SCHEME_HTTP, 'HTTP'), (SCHEME_HTTPS, 'HTTPS')]
@@ -34,7 +40,7 @@ class ProxyEntry(models.Model):
         (TUNNEL_ERROR, 'Error'),
     ]
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='proxy_entries')
+    domain = models.OneToOneField(Domain, on_delete=models.CASCADE, related_name='proxy_entry')
     cloudserver_host = models.CharField(max_length=253, unique=True)
     tunnel_port = models.IntegerField()
     home_port = models.IntegerField()

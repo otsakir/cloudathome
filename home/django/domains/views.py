@@ -44,7 +44,8 @@ class DeleteDomainView(View):
     def post(self, request, pk):
         domain = get_object_or_404(Domain, pk=pk)
         client = CloudServerClient()
-        for entry in domain.proxy_entries.all():
+        try:
+            entry = domain.proxy_entry
             if entry.tunnel_pid:
                 try:
                     TunnelService.close_tunnel(entry.tunnel_pid)
@@ -54,6 +55,8 @@ class DeleteDomainView(View):
                 client.delete_proxy_mapping(entry.cloudserver_host)
             except Exception:
                 pass
+        except ProxyEntry.DoesNotExist:
+            pass
         domain.delete()
         return redirect('domain_list')
 
