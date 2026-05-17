@@ -96,6 +96,14 @@ class CertbotService:
 class TunnelService:
 
     @staticmethod
+    def is_running(pid):
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+
+    @staticmethod
     def open_tunnel(tunnel_port, home_port):
         cfg = get_config()
         proc = subprocess.Popen([
@@ -112,6 +120,9 @@ class TunnelService:
 
     @staticmethod
     def close_tunnel(pid):
-        os.kill(pid, signal.SIGTERM)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass  # process already gone, nothing to do
 
 
