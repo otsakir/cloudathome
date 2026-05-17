@@ -4,9 +4,9 @@ from django.views import View
 from django.views.generic import ListView, DetailView, FormView
 
 from cloudlink.services import CloudServerClient, CloudServerError
-from domains.forms import AddDomainForm, ProxyEntryForm
+from domains.forms import AddDomainForm, IssueCertificateForm, ProxyEntryForm
 from domains.models import Domain, ProxyEntry
-from domains.services import TunnelService
+from domains.services import CertbotError, CertbotService, TunnelService
 
 
 def _delete_proxy_entry(entry):
@@ -100,6 +100,32 @@ class ProxyEntryDetailView(DetailView):
                 entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
                 entry.save()
         return entry
+
+
+class IssueCertificateView(FormView):
+    template_name = 'domains/issue_certificate.html'
+    form_class = IssueCertificateForm
+
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.entry = get_object_or_404(ProxyEntry, pk=kwargs['pk'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['entry'] = self.entry
+        return context
+
+    def form_valid(self, form):
+        try:
+            CertbotService.obtain_certificate(
+                self.entry.domain,
+                form.cleaned_data['email'],
+                self.entry.home_port,
+            )
+        except CertbotError as e:
+            form.add_error(None, str(e))
+            return self.form_invalid(form)
+        return redirect('proxy_entry_detail', pk=self.entry.pk)
 
 
 class DeleteProxyEntryView(View):
