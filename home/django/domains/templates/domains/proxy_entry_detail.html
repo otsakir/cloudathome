@@ -7,6 +7,14 @@
   <a href="{% url 'domain_detail' object.domain_id %}">Back to {{ object.domain }}</a>
 </p>
 
+{% if messages %}
+  <ul>
+    {% for message in messages %}
+      <li><strong>{{ message }}</strong></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 <h2>Details</h2>
 <table>
   <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
@@ -21,6 +29,8 @@
   {% csrf_token %}
   {% if object.tunnel_status == 'open' %}
     <button type="submit">Close tunnel</button>
+  {% elif object.tunnel_status == 'error' %}
+    <button type="submit">Retry</button>
   {% else %}
     <button type="submit">Open tunnel</button>
   {% endif %}

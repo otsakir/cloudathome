@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.generic import ListView, DetailView, FormView
@@ -88,16 +89,23 @@ class ProxyEntryDetailView(DetailView):
     model = ProxyEntry
     template_name = 'domains/proxy_entry_detail.html'
 
+    def get_object(self, queryset=None):
+        entry = super().get_object(queryset)
+        # Correct stale "open" status if the SSH process is no longer running
+        if entry.tunnel_status == ProxyEntry.TUNNEL_OPEN and entry.tunnel_pid:
+            if not TunnelService.is_running(entry.tunnel_pid):
+                entry.tunnel_pid = None
+                entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
+                entry.save()
+        return entry
+
 
 class TunnelToggleView(View):
     def post(self, request, pk):
         entry = get_object_or_404(ProxyEntry, pk=pk)
         if entry.tunnel_status == ProxyEntry.TUNNEL_OPEN:
             if entry.tunnel_pid:
-                try:
-                    TunnelService.close_tunnel(entry.tunnel_pid)
-                except Exception:
-                    pass
+                TunnelService.close_tunnel(entry.tunnel_pid)
             entry.tunnel_pid = None
             entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
         else:
@@ -105,7 +113,8 @@ class TunnelToggleView(View):
                 pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port)
                 entry.tunnel_pid = pid
                 entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
-            except Exception:
+            except Exception as e:
                 entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
+                messages.error(request, f'Failed to open tunnel: {e}')
         entry.save()
         return redirect('proxy_entry_detail', pk=entry.pk)
