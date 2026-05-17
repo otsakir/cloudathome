@@ -3,6 +3,7 @@ from django.urls import path
 from domains.views import (
     AddDomainView,
     DeleteDomainView,
+    DeleteProxyEntryView,
     DomainDetailView,
     DomainListView,
     ProxyEntryCreateView,
@@ -17,5 +18,6 @@ urlpatterns = [
     path('<int:pk>/delete/', DeleteDomainView.as_view(), name='delete_domain'),
     path('<int:domain_pk>/proxy-entries/add/', ProxyEntryCreateView.as_view(), name='add_proxy_entry'),
     path('proxy-entries/<int:pk>/', ProxyEntryDetailView.as_view(), name='proxy_entry_detail'),
+    path('proxy-entries/<int:pk>/delete/', DeleteProxyEntryView.as_view(), name='delete_proxy_entry'),
     path('proxy-entries/<int:pk>/tunnel/', TunnelToggleView.as_view(), name='tunnel_toggle'),
 ]
