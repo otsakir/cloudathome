@@ -9,6 +9,18 @@ from domains.models import Domain, ProxyEntry
 from domains.services import TunnelService
 
 
+def _delete_proxy_entry(entry):
+    """Close the tunnel, remove the cloud mapping, and delete the local record."""
+    if entry.tunnel_pid:
+        TunnelService.close_tunnel(entry.tunnel_pid)
+    client = CloudServerClient()
+    try:
+        client.delete_proxy_mapping(entry.cloudserver_host)
+    except Exception:
+        pass
+    entry.delete()
+
+
 class DomainListView(ListView):
     model = Domain
     template_name = 'domains/domain_list.html'
@@ -36,18 +48,8 @@ class DeleteDomainView(View):
 
     def post(self, request, pk):
         domain = get_object_or_404(Domain, pk=pk)
-        client = CloudServerClient()
         try:
-            entry = domain.proxy_entry
-            if entry.tunnel_pid:
-                try:
-                    TunnelService.close_tunnel(entry.tunnel_pid)
-                except Exception:
-                    pass
-            try:
-                client.delete_proxy_mapping(entry.cloudserver_host)
-            except Exception:
-                pass
+            _delete_proxy_entry(domain.proxy_entry)
         except ProxyEntry.DoesNotExist:
             pass
         domain.delete()
@@ -98,6 +100,14 @@ class ProxyEntryDetailView(DetailView):
                 entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
                 entry.save()
         return entry
+
+
+class DeleteProxyEntryView(View):
+    def post(self, request, pk):
+        entry = get_object_or_404(ProxyEntry, pk=pk)
+        domain_pk = entry.domain_id
+        _delete_proxy_entry(entry)
+        return redirect('domain_detail', pk=domain_pk)
 
 
 class TunnelToggleView(View):
