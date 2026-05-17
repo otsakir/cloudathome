@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from homes.services import ElevatedOperations
 from homes.services import HAProxyService
+from homes.tunnels.manage_tunnel import tunnel_manager
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse
@@ -120,7 +121,16 @@ class ProxyMappingListCreateView(ListCreateAPIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        mapping = serializer.save(home=home)
+        # Allocate the next free port within this home's assigned range
+        port_base = tunnel_manager.get_home_port_base(home.home_index)
+        port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
+        used = set(ProxyMapping.objects.filter(home=home).values_list('tunnel_port', flat=True))
+        try:
+            tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
+        except StopIteration:
+            return Response({'message': 'no free tunnel ports available'}, status=status.HTTP_409_CONFLICT)
+
+        mapping = serializer.save(home=home, tunnel_port=tunnel_port)
 
         try:
             HAProxyService.add_mapping(mapping)
@@ -128,7 +138,7 @@ class ProxyMappingListCreateView(ListCreateAPIView):
             mapping.delete()
             return Response({'message': 'failed to configure proxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(ProxyMappingSerializer(mapping).data, status=status.HTTP_201_CREATED)
 
 
 class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):

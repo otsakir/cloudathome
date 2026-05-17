@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><title>Proxy entry — {{ object.cloudserver_host }}</title></head>
+<body>
+<h1>{{ object.cloudserver_host }}</h1>
+<p>
+  <a href="{% url 'domain_detail' object.domain_id %}">Back to {{ object.domain }}</a>
+</p>
+
+<h2>Details</h2>
+<table>
+  <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
+  <tr><th>Scheme</th><td>{{ object.scheme|upper }}</td></tr>
+  <tr><th>Tunnel port</th><td>{{ object.tunnel_port }}</td></tr>
+  <tr><th>Home port</th><td>{{ object.home_port }}</td></tr>
+  <tr><th>Tunnel status</th><td>{{ object.tunnel_status }}</td></tr>
+</table>
+
+<h2>Tunnel</h2>
+<form method="post" action="{% url 'tunnel_toggle' object.pk %}">
+  {% csrf_token %}
+  {% if object.tunnel_status == 'open' %}
+    <button type="submit">Close tunnel</button>
+  {% else %}
+    <button type="submit">Open tunnel</button>
+  {% endif %}
+</form>
+</body>
+</html>
