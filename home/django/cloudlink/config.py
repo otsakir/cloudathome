@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import os
 
 import yaml
 
-_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / 'config' / 'cloudlink.yaml'
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / 'config.yaml'
 
 
 @dataclass
@@ -16,6 +16,11 @@ class SSHConfig:
 
 
 @dataclass
+class CertbotConfig:
+    deploy_path: str | None = None
+
+
+@dataclass
 class CloudConfig:
     cloudserver_url: str
     auth_token: str
@@ -23,10 +28,11 @@ class CloudConfig:
     ssh: SSHConfig
     port_base: int
     port_count: int
+    certbot: CertbotConfig = field(default_factory=CertbotConfig)
 
 
 def load_config(path=None) -> CloudConfig:
-    resolved = Path(os.environ.get('CLOUDLINK_CONFIG', '') or path or _DEFAULT_CONFIG_PATH)
+    resolved = Path(os.environ.get('CLOUDATHOME_CONFIG', '') or path or _DEFAULT_CONFIG_PATH)
     try:
         with open(resolved) as f:
             data = yaml.safe_load(f)
@@ -34,19 +40,22 @@ def load_config(path=None) -> CloudConfig:
         raise FileNotFoundError(
             f'CloudAtHome config not found at {resolved}. '
             'Run scripts/register_home.py to create it, or set the '
-            'CLOUDLINK_CONFIG environment variable to the correct path.'
+            'CLOUDATHOME_CONFIG environment variable to the correct path.'
         )
     try:
+        cl = data['cloudlink']
+        certbot_data = data.get('certbot') or {}
         return CloudConfig(
-            cloudserver_url=data['cloudserver_url'],
-            auth_token=data['auth_token'],
-            home_slug=data['home_slug'],
-            ssh=SSHConfig(**data['ssh']),
-            port_base=data['ports']['base'],
-            port_count=data['ports']['count'],
+            cloudserver_url=cl['cloudserver_url'],
+            auth_token=cl['auth_token'],
+            home_slug=cl['home_slug'],
+            ssh=SSHConfig(**cl['ssh']),
+            port_base=cl['ports']['base'],
+            port_count=cl['ports']['count'],
+            certbot=CertbotConfig(deploy_path=certbot_data.get('deploy_path')),
         )
     except (KeyError, TypeError) as e:
-        raise ValueError(f'cloudlink.yaml is missing required field: {e}') from e
+        raise ValueError(f'config.yaml is missing required field: {e}') from e
 
 
 _config: CloudConfig | None = None

@@ -21,10 +21,11 @@ A system that allows running application servers at home and making them reachab
 
 ### How it works
 
-1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config/cloudlink.yaml`.
-2. The Home Console Django app is started. It reads `cloudlink.yaml` and is ready for use.
-3. The operator adds a domain in the Home Console. The ACME flow runs automatically: a temporary SSH tunnel is opened, a proxy mapping is registered on the cloud server, Let's Encrypt issues a certificate via HTTP-01 challenge, then the temporary tunnel and mapping are torn down.
-4. The operator adds an HTTPS proxy entry for the domain and opens its SSH reverse tunnel. HAProxy's SNI map is updated immediately — no reload needed.
+1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config.yaml`.
+2. The Home Console Django app is started. It reads `config.yaml` and is ready for use.
+3. The operator adds a domain and a proxy entry in the Home Console. The proxy entry registers the cloud proxy mapping and records the allocated tunnel port.
+4. The operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
+5. The operator closes the temporary tunnel if needed, or keeps it open for production traffic.
 5. Incoming HTTPS traffic hits HAProxy on port 443, which routes it by SNI hostname through the tunnel to the home service.
 
 
@@ -83,27 +84,25 @@ The `home/` directory contains everything needed to connect a home network to th
 
 ```
 home/
-├── config/
-│   ├── cloudlink.yaml          # written by register_home.py — contains secrets, not committed
-│   └── cloudlink.yaml.example  # template showing all required fields
+├── config.yaml              # written by register_home.py — contains secrets, not committed
+├── config.yaml.example      # template showing all required fields
+├── certbot/                 # created on first certificate issuance, gitignored
+│   ├── config/              # certbot config and issued certificates
+│   ├── work/                # certbot working directory
+│   └── logs/                # certbot logs
 ├── scripts/
-│   ├── generate_keys.py        # generate a dedicated SSH key pair for tunnel use
-│   └── register_home.py        # register with the cloud server, write cloudlink.yaml
-└── django/                     # Home Console Django app
-    ├── cloudlink/              # config loading, cloud API client, dashboard
-    └── domains/                # domain, certificate, and tunnel management
+│   ├── generate_keys.py     # generate a dedicated SSH key pair for tunnel use
+│   └── register_home.py     # register with the cloud server, write config.yaml
+└── django/                  # Home Console Django app
+    ├── cloudlink/           # config loading, cloud API client, dashboard
+    └── domains/             # domain, certificate, and tunnel management
 ```
 
 ### Prerequisites
 
 - Python 3.11+
-- Docker (required for certificate issuance)
+- `certbot` CLI installed on the home machine (e.g. `sudo apt install certbot` or `pip install certbot`)
 - A registered account on the cloud server (see [User accounts](#user-accounts) above)
-- The `cloudathome-acme` Docker image — build it once:
-
-```bash
-docker build -t cloudathome-acme -f home/nginx.dockerfile home/
-```
 
 ### Step 1 — Generate an SSH key pair
 
@@ -123,7 +122,7 @@ Use `--force` to overwrite an existing key pair.
 
 ### Step 2 — Register the home with the cloud server
 
-This script authenticates with the cloud server, claims a home slot, and writes the connection config to `home/config/cloudlink.yaml`.
+This script authenticates with the cloud server, claims a home slot, and writes the connection config to `home/config.yaml`.
 
 ```bash
 python home/scripts/register_home.py \
@@ -137,14 +136,14 @@ python home/scripts/register_home.py \
 On success it prints a summary:
 
 ```
-Done. Configuration written to: home/config/cloudlink.yaml
+Done. Configuration written to: home/config.yaml
   home_slug    : xK3mAbcDef9pQr
   ssh_username : home02_alice
   ssh_host     : cloud.example.com:22
   port range   : 2200 – 2209
 ```
 
-The generated `cloudlink.yaml` contains secrets (auth token, key path) and is gitignored. See `home/config/cloudlink.yaml.example` for the full schema.
+The generated `config.yaml` contains secrets (auth token, key path) and is gitignored. See `home/config.yaml.example` for the full schema.
 
 ### Step 3 — Install dependencies and run the Home Console
 
@@ -156,58 +155,27 @@ python manage.py migrate
 python manage.py runserver 0.0.0.0:8001
 ```
 
-The Home Console is available at `http://localhost:8001/`. Django reads `cloudlink.yaml` at startup. If the file is missing or malformed, startup fails immediately with a clear error message.
+The Home Console is available at `http://localhost:8001/`. Django reads `config.yaml` at startup. If the file is missing or malformed, startup fails immediately with a clear error message.
 
-> **Changing the config path:** Set the `CLOUDLINK_CONFIG` environment variable to an absolute path if you want to keep `cloudlink.yaml` somewhere other than `home/config/`.
-
-### Running tests
-
-The Home Console has a pytest-based test suite under `home/django/tests/`.
-
-Install test dependencies:
-
-```bash
-cd home/django
-pip install -r requirements-test.txt
-```
-
-Run all tests:
-
-```bash
-pytest tests/ -v
-```
-
-Some tests (e.g. `test_certbot_failure_with_fake_domain`) use the real Docker daemon and require the `cloudathome-acme` image. `ensure_image()` builds it automatically if it is not already present — this may take a minute on the first run. Make sure Docker is running before executing the suite.
+> **Changing the config path:** Set the `CLOUDATHOME_CONFIG` environment variable to an absolute path if you want to keep `config.yaml` somewhere other than `home/`.
 
 ### Obtaining a TLS certificate
 
-Go to **Domains → Add domain** and fill in:
+Certificate issuance is tied to a proxy entry. The full sequence from the Home Console:
 
-- **Domain name** — the public domain (e.g. `mysite.example.com`). DNS must already point to the cloud server.
-- **Email address** — used by Let's Encrypt for renewal notifications.
-- **Certificate output directory** — absolute path on this machine where certificates will be stored (e.g. `/etc/cloudathome/certs`).
+**1. Add a domain** — go to **Domains → Add domain** and enter the domain name (e.g. `mysite.example.com`). DNS must already point to the cloud server.
 
-Submitting triggers the ACME flow automatically:
+**2. Add a proxy entry** — from the domain detail page click **Add**. Choose a scheme and the local port certbot will listen on (e.g. `8082`). This registers the proxy mapping on the cloud server; the tunnel port is allocated server-side.
 
-1. A free tunnel port is allocated from the home's assigned range.
-2. A temporary HTTP proxy mapping is registered on the cloud server.
-3. An SSH reverse tunnel is opened to that port.
-4. The `cloudathome-acme` container starts; certbot performs the HTTP-01 challenge.
-5. The tunnel and mapping are torn down; the container is removed.
-6. The domain is updated with the certificate path and expiry date.
+**3. Open the tunnel** — on the proxy entry detail page click **Open tunnel**. This starts an SSH reverse tunnel: `cloud_tunnel_port → home:home_port`.
 
-### Exposing a service (HTTPS proxy entry)
+**4. Issue the certificate** — with the tunnel open, enter your email and click **Issue certificate**. Certbot runs in standalone mode, Let's Encrypt validates the HTTP-01 challenge through the tunnel, and the certificate is saved to `home/certbot/config/live/<domain>/`.
 
-After a certificate exists for a domain, go to the domain detail page and click **Add HTTPS proxy entry**. Fill in:
-
-- **Public hostname** — the domain HAProxy will route (usually the same as the domain name).
-- **Home port** — the local port your service listens on (e.g. `443`).
-
-This creates the cloud proxy mapping. The tunnel is not opened automatically — click **Open tunnel** on the proxy entry to start it.
+The domain record is updated with the certificate path and expiry date on success.
 
 ### Managing tunnels
 
-Each proxy entry on the domain detail page has an **Open tunnel / Close tunnel** button. Tunnels are OS-level SSH processes; their PIDs are stored in the database so they can be stopped cleanly even after a Django restart.
+Each proxy entry detail page has an **Open tunnel / Close tunnel** button. Tunnels are OS-level SSH processes; their PIDs are stored in the database so they can be stopped cleanly even after a Django restart. If a tunnel process dies unexpectedly, the status is corrected automatically the next time the proxy entry page is loaded.
 
 ---
 
@@ -243,28 +211,27 @@ python home/scripts/register_home.py \
     --private-key ~/.ssh/cloudathome_ed25519
 ```
 
-This writes `home/config/cloudlink.yaml` with the assigned SSH username, port range, and auth token.
+This writes `home/config.yaml` with the assigned SSH username, port range, and auth token.
 
 ### 5. Start the Home Console
 
 ```bash
-docker build -t cloudathome-acme -f home/nginx.dockerfile home/   # first time only
 cd home/django && source .venv/bin/activate
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8001
 ```
 
-### 6. Obtain a TLS certificate
+### 6. Add a domain and proxy entry
 
-Go to `http://localhost:8001/domains/add/`. Enter `mysite.example.com`, your email, and a local cert path (e.g. `/etc/cloudathome/certs`). Submit and wait — the ACME flow runs automatically.
+Go to `http://localhost:8001/domains/add/` and enter `mysite.example.com`. From the domain detail page click **Add** to create a proxy entry — choose scheme `http` and the port certbot will listen on (e.g. `8082`).
 
-### 7. Add an HTTPS proxy entry
+### 7. Open the tunnel and obtain a TLS certificate
 
-From the domain detail page click **Add HTTPS proxy entry**. Set the hostname to `mysite.example.com` and the home port to the port your service listens on (e.g. `443`).
+From the proxy entry detail page click **Open tunnel**, then enter your email and click **Issue certificate**. Wait for certbot to complete — the domain record is updated with the cert path on success.
 
-### 8. Open the tunnel
+### 8. Open the tunnel for production traffic
 
-Click **Open tunnel** on the proxy entry.
+Click **Open tunnel** on the proxy entry (if you closed it after cert issuance).
 
 ### 9. Test
 
@@ -299,8 +266,7 @@ Note the assigned **SSH username** (e.g. `home00_alice`) and **port base** (e.g.
 ### 4. Start a local service to expose
 
 ```bash
-docker build -t cloudathome-home-sim -f home/nginx.dockerfile home/
-docker run --rm -p 8443:80 cloudathome-home-sim
+docker run --rm -p 8443:80 nginx
 ```
 
 This starts nginx on `localhost:8443`.

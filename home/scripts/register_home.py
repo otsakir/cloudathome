@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Register this home with a CloudAtHome cloud server and write config/cloudlink.yaml.
+Register this home with a CloudAtHome cloud server and write config.yaml.
 
 Usage:
     python register_home.py \\
@@ -10,7 +10,7 @@ Usage:
         --public-key ~/.ssh/cloudathome_ed25519.pub \\
         --private-key ~/.ssh/cloudathome_ed25519 \\
         [--ssh-port 8022] \\
-        [--output /path/to/cloudlink.yaml]
+        [--output /path/to/config.yaml]
 
 Run generate_keys.py first if you do not yet have a key pair.
 """
@@ -31,9 +31,9 @@ except ImportError:
     print('Error: pyyaml is not installed. Run: pip install pyyaml', file=sys.stderr)
     sys.exit(1)
 
-# Default output path: home/config/cloudlink.yaml (two levels up from scripts/)
+# Default output path: home/config.yaml (two levels up from scripts/)
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-DEFAULT_OUTPUT = _SCRIPTS_DIR.parent / 'config' / 'cloudlink.yaml'
+DEFAULT_OUTPUT = _SCRIPTS_DIR.parent / 'config.yaml'
 
 
 def main():
@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--ssh-port', type=int, default=8022,
                         help='SSH port on the cloud server (default: 8022)')
     parser.add_argument('--output', '-o', type=Path, default=DEFAULT_OUTPUT,
-                        help=f'Output path for cloudlink.yaml (default: {DEFAULT_OUTPUT})')
+                        help=f'Output path for config.yaml (default: {DEFAULT_OUTPUT})')
     args = parser.parse_args()
 
     base_url = args.cloudserver_url.rstrip('/')
@@ -101,18 +101,20 @@ def main():
     ssh_host = urlparse(base_url).hostname
 
     config = {
-        'cloudserver_url': base_url,
-        'auth_token': token,
-        'home_slug': home['slug'],
-        'ssh': {
-            'host': ssh_host,
-            'port': args.ssh_port,
-            'username': home['ssh_username'],
-            'private_key_path': str(args.private_key.resolve()),
-        },
-        'ports': {
-            'base': home['port_base'],
-            'count': home['port_count'],
+        'cloudlink': {
+            'cloudserver_url': base_url,
+            'auth_token': token,
+            'home_slug': home['slug'],
+            'ssh': {
+                'host': ssh_host,
+                'port': args.ssh_port,
+                'username': home['ssh_username'],
+                'private_key_path': str(args.private_key.resolve()),
+            },
+            'ports': {
+                'base': home['port_base'],
+                'count': home['port_count'],
+            },
         },
     }
 

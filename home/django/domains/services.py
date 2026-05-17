@@ -1,5 +1,6 @@
 import datetime
 import os
+import shutil
 import signal
 import subprocess
 from pathlib import Path
@@ -51,6 +52,21 @@ class CertbotService:
         domain.cert_expiry = expiry
         domain.cert_path = str(cert_path)
         domain.save()
+
+        deploy_path = get_config().certbot.deploy_path
+        if deploy_path:
+            cls._deploy_certificates(domain.name, Path(deploy_path))
+
+    @classmethod
+    def _deploy_certificates(cls, domain_name, deploy_path):
+        """Copy fullchain.pem and privkey.pem to deploy_path/<domain_name>/."""
+        src = cls.CONFIG_DIR / 'live' / domain_name
+        dst = deploy_path / domain_name
+        dst.mkdir(parents=True, exist_ok=True)
+        for filename in ('fullchain.pem', 'privkey.pem', 'chain.pem', 'cert.pem'):
+            src_file = src / filename
+            if src_file.exists():
+                shutil.copy2(src_file, dst / filename)
 
     @classmethod
     def check_certificate(cls, cert_path):
