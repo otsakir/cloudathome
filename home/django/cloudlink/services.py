@@ -24,11 +24,11 @@ class CloudServerClient:
             raise CloudServerError('no homes assigned to this account')
         return homes[0]
 
-    def create_proxy_mapping(self, host, tunnel_port, scheme):
+    def create_proxy_mapping(self, host, scheme):
         resp = requests.post(
             self._url(f'/api/homes/{get_config().home_slug}/proxy-mappings/'),
             headers=self._headers(),
-            json={'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme},
+            json={'host': host, 'scheme': scheme},
         )
         if resp.status_code != 201:
             raise CloudServerError(f'create_proxy_mapping failed: {resp.status_code} {resp.text}')

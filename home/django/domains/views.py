@@ -5,7 +5,7 @@ from django.views.generic import ListView, DetailView, FormView
 from cloudlink.services import CloudServerClient, CloudServerError
 from domains.forms import AddDomainForm, ProxyEntryForm
 from domains.models import Domain, ProxyEntry
-from domains.services import DomainOrchestrator, OrchestratorError, TunnelService
+from domains.services import TunnelService
 
 
 class DomainListView(ListView):
@@ -19,15 +19,7 @@ class AddDomainView(FormView):
     form_class = AddDomainForm
 
     def form_valid(self, form):
-        try:
-            domain = DomainOrchestrator.add_domain(
-                name=form.cleaned_data['name'],
-                email=form.cleaned_data['email'],
-                cert_output_path=form.cleaned_data['cert_output_path'],
-            )
-        except Exception as e:
-            form.add_error(None, str(e))
-            return self.form_invalid(form)
+        domain, _ = Domain.objects.get_or_create(name=form.cleaned_data['name'])
         return redirect('domain_detail', pk=domain.pk)
 
 
@@ -75,29 +67,26 @@ class ProxyEntryCreateView(FormView):
         return context
 
     def form_valid(self, form):
-        try:
-            tunnel_port = DomainOrchestrator.allocate_tunnel_port()
-        except OrchestratorError as e:
-            form.add_error(None, str(e))
-            return self.form_invalid(form)
-
         client = CloudServerClient()
         try:
-            client.create_proxy_mapping(
-                form.cleaned_data['cloudserver_host'], tunnel_port, 'https'
-            )
+            result = client.create_proxy_mapping(self.domain.name, form.cleaned_data['scheme'])
         except CloudServerError as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
 
-        ProxyEntry.objects.create(
+        entry = ProxyEntry.objects.create(
             domain=self.domain,
-            cloudserver_host=form.cleaned_data['cloudserver_host'],
-            tunnel_port=tunnel_port,
+            cloudserver_host=self.domain.name,
+            tunnel_port=result['tunnel_port'],
             home_port=form.cleaned_data['home_port'],
-            scheme=ProxyEntry.SCHEME_HTTPS,
+            scheme=form.cleaned_data['scheme'],
         )
-        return redirect('domain_detail', pk=self.domain.pk)
+        return redirect('proxy_entry_detail', pk=entry.pk)
+
+
+class ProxyEntryDetailView(DetailView):
+    model = ProxyEntry
+    template_name = 'domains/proxy_entry_detail.html'
 
 
 class TunnelToggleView(View):
@@ -119,4 +108,4 @@ class TunnelToggleView(View):
             except Exception:
                 entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
         entry.save()
-        return redirect('domain_detail', pk=entry.domain_id)
+        return redirect('proxy_entry_detail', pk=entry.pk)

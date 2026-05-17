@@ -1,5 +1,7 @@
 from django import forms
 
+from domains.models import ProxyEntry
+
 
 class AddDomainForm(forms.Form):
     name = forms.CharField(
@@ -7,22 +9,12 @@ class AddDomainForm(forms.Form):
         label='Domain name',
         help_text='e.g. mysite.example.com',
     )
-    email = forms.EmailField(
-        label='Email address',
-        help_text="Used by Let's Encrypt for renewal notifications.",
-    )
-    cert_output_path = forms.CharField(
-        max_length=512,
-        label='Certificate output directory',
-        help_text='Absolute path on this machine where certificates will be stored.',
-    )
 
 
 class ProxyEntryForm(forms.Form):
-    cloudserver_host = forms.CharField(
-        max_length=253,
-        label='Public hostname',
-        help_text='The domain name HAProxy will route to this entry.',
+    scheme = forms.ChoiceField(
+        choices=ProxyEntry.SCHEME_CHOICES,
+        label='Scheme',
     )
     home_port = forms.IntegerField(
         label='Home port',

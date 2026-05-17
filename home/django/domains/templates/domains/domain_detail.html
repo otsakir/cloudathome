@@ -19,33 +19,10 @@
 
 {% if object.proxy_entry %}
   {% with entry=object.proxy_entry %}
-  <table>
-    <thead>
-      <tr>
-        <th>Host</th><th>Tunnel port</th><th>Home port</th><th>Scheme</th>
-        <th>Tunnel</th><th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>{{ entry.cloudserver_host }}</td>
-        <td>{{ entry.tunnel_port }}</td>
-        <td>{{ entry.home_port }}</td>
-        <td>{{ entry.scheme }}</td>
-        <td>{{ entry.tunnel_status }}</td>
-        <td>
-          <form method="post" action="{% url 'tunnel_toggle' entry.pk %}">
-            {% csrf_token %}
-            {% if entry.tunnel_status == 'open' %}
-              <button type="submit">Close tunnel</button>
-            {% else %}
-              <button type="submit">Open tunnel</button>
-            {% endif %}
-          </form>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <p>
+    <a href="{% url 'proxy_entry_detail' entry.pk %}">View proxy entry</a>
+    — {{ entry.scheme|upper }} → :{{ entry.home_port }} (tunnel {{ entry.tunnel_status }})
+  </p>
   {% endwith %}
 {% else %}
   <p>No proxy entry yet. <a href="{% url 'add_proxy_entry' object.pk %}">Add one.</a></p>

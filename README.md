@@ -160,6 +160,25 @@ The Home Console is available at `http://localhost:8001/`. Django reads `cloudli
 
 > **Changing the config path:** Set the `CLOUDLINK_CONFIG` environment variable to an absolute path if you want to keep `cloudlink.yaml` somewhere other than `home/config/`.
 
+### Running tests
+
+The Home Console has a pytest-based test suite under `home/django/tests/`.
+
+Install test dependencies:
+
+```bash
+cd home/django
+pip install -r requirements-test.txt
+```
+
+Run all tests:
+
+```bash
+pytest tests/ -v
+```
+
+Some tests (e.g. `test_certbot_failure_with_fake_domain`) use the real Docker daemon and require the `cloudathome-acme` image. `ensure_image()` builds it automatically if it is not already present — this may take a minute on the first run. Make sure Docker is running before executing the suite.
+
 ### Obtaining a TLS certificate
 
 Go to **Domains → Add domain** and fill in:

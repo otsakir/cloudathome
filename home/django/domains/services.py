@@ -2,11 +2,14 @@ import datetime
 import os
 import signal
 import subprocess
+from pathlib import Path
 
 import docker
 
 from cloudlink.config import get_config
-from cloudlink.services import CloudServerClient
+
+# home/ directory — build context for the cloudathome-acme image
+_HOME_DIR = Path(__file__).resolve().parents[2]
 
 
 class CertbotError(Exception):
@@ -20,8 +23,33 @@ class CertbotService:
     CERT_BASE = '/etc/letsencrypt'
 
     @classmethod
+    def ensure_image(cls):
+        """
+        sudo docker run -it --rm -p 80:80   -v "/etc/letsencrypt:/etc/letsencrypt"   certbot/certbot certonly --standalone -d example.com
+        :return:
+        """
+        client = docker.from_env()
+        try:
+            client.images.get(cls.IMAGE)
+        except docker.errors.ImageNotFound:
+            # Use the CLI rather than the SDK to avoid credential-store resolution
+            # for unrelated registries (e.g. docker-credential-gcloud) during build.
+            subprocess.run(
+                ['docker', 'build', '-t', cls.IMAGE, '-f', 'nginx.dockerfile', '.'],
+                cwd=str(_HOME_DIR),
+                check=True,
+            )
+
+    @classmethod
     def issue_certificate(cls, domain, email, cert_output_path):
         client = docker.from_env()
+        try:
+            client.images.get(cls.IMAGE)
+        except docker.errors.ImageNotFound:
+            raise CertbotError(
+                f'Docker image "{cls.IMAGE}" not found. '
+                f'Build it first: docker build -t {cls.IMAGE} -f home/nginx.dockerfile home/'
+            )
         container = client.containers.run(
             cls.IMAGE,
             detach=True,
@@ -87,63 +115,3 @@ class TunnelService:
         os.kill(pid, signal.SIGTERM)
 
 
-class OrchestratorError(Exception):
-    pass
-
-
-class DomainOrchestrator:
-
-    @staticmethod
-    def allocate_tunnel_port():
-        from domains.models import ProxyEntry
-        cfg = get_config()
-        used = set(ProxyEntry.objects.values_list('tunnel_port', flat=True))
-        try:
-            return next(
-                p for p in range(cfg.port_base, cfg.port_base + cfg.port_count)
-                if p not in used
-            )
-        except StopIteration:
-            raise OrchestratorError('No free tunnel ports available')
-
-    @staticmethod
-    def add_domain(name, email, cert_output_path):
-        from domains.models import Domain, ProxyEntry
-
-        # create home-side objects
-        tunnel_port = DomainOrchestrator.allocate_tunnel_port()
-        domain, _ = Domain.objects.get_or_create(name=name)
-        entry = ProxyEntry.objects.create(
-            domain=domain,
-            cloudserver_host=name,
-            tunnel_port=tunnel_port,
-            home_port=80,
-            scheme=ProxyEntry.SCHEME_HTTP,
-        )
-        client = CloudServerClient()
-        cert_paths = None
-        try:
-            client.create_proxy_mapping(name, tunnel_port, 'http')
-            pid = TunnelService.open_tunnel(tunnel_port, 80)
-            entry.tunnel_pid = pid
-            entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
-            entry.save()
-            cert_paths = CertbotService.issue_certificate(name, email, cert_output_path)
-        finally:
-            if entry.tunnel_pid:
-                try:
-                    TunnelService.close_tunnel(entry.tunnel_pid)
-                except Exception:
-                    pass
-            try:
-                client.delete_proxy_mapping(name)
-            except Exception:
-                pass
-            entry.delete()
-
-        expiry = CertbotService.check_certificate(name, cert_paths['cert'])
-        domain.cert_status = Domain.CERT_VALID
-        domain.cert_expiry = expiry
-        domain.cert_path = cert_paths['cert']
-        domain.save()
-        return domain

@@ -2,11 +2,11 @@
 <html>
 <head><title>Add proxy entry — {{ domain.name }}</title></head>
 <body>
-<h1>Add HTTPS proxy entry for {{ domain.name }}</h1>
+<h1>Add proxy entry for {{ domain.name }}</h1>
 <p><a href="{% url 'domain_detail' domain.pk %}">Back to {{ domain.name }}</a></p>
 
-<p>Creates a cloud proxy mapping and a local database record. Open the tunnel separately
-after creation.</p>
+<p>Registers a proxy mapping on the cloud server. The tunnel port is allocated by the cloud server.
+Open the tunnel separately after creation.</p>
 
 {% if form.non_field_errors %}
   <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
