@@ -6,6 +6,7 @@ from domains.views import (
     DeleteProxyEntryView,
     DomainDetailView,
     DomainListView,
+    IssueCertificateView,
     ProxyEntryCreateView,
     ProxyEntryDetailView,
     TunnelToggleView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path('proxy-entries/<int:pk>/', ProxyEntryDetailView.as_view(), name='proxy_entry_detail'),
     path('proxy-entries/<int:pk>/delete/', DeleteProxyEntryView.as_view(), name='delete_proxy_entry'),
     path('proxy-entries/<int:pk>/tunnel/', TunnelToggleView.as_view(), name='tunnel_toggle'),
+    path('proxy-entries/<int:pk>/issue-certificate/', IssueCertificateView.as_view(), name='issue_certificate'),
 ]

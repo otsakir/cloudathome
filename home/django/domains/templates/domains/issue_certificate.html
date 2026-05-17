@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>Issue certificate — {{ entry.cloudserver_host }}</title></head>
+<body>
+<h1>Issue certificate for {{ entry.cloudserver_host }}</h1>
+<p><a href="{% url 'proxy_entry_detail' entry.pk %}">Back to proxy entry</a></p>
+
+{% if form.non_field_errors %}
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <table>{{ form.as_table }}</table>
+  <button type="submit">Issue certificate</button>
+</form>
+</body>
+</html>

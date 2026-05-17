@@ -4,11 +4,9 @@ import signal
 import subprocess
 from pathlib import Path
 
-import docker
-
 from cloudlink.config import get_config
 
-# home/ directory — build context for the cloudathome-acme image
+# home/ directory
 _HOME_DIR = Path(__file__).resolve().parents[2]
 
 
@@ -18,67 +16,44 @@ class CertbotError(Exception):
 
 class CertbotService:
 
-    IMAGE = 'cloudathome-acme'
-    WEBROOT = '/var/www/certbot'
-    CERT_BASE = '/etc/letsencrypt'
+    CONFIG_DIR = _HOME_DIR / 'certbot' / 'config'
+    WORK_DIR   = _HOME_DIR / 'certbot' / 'work'
+    LOGS_DIR   = _HOME_DIR / 'certbot' / 'logs'
 
     @classmethod
-    def ensure_image(cls):
-        """
-        sudo docker run -it --rm -p 80:80   -v "/etc/letsencrypt:/etc/letsencrypt"   certbot/certbot certonly --standalone -d example.com
-        :return:
-        """
-        client = docker.from_env()
-        try:
-            client.images.get(cls.IMAGE)
-        except docker.errors.ImageNotFound:
-            # Use the CLI rather than the SDK to avoid credential-store resolution
-            # for unrelated registries (e.g. docker-credential-gcloud) during build.
-            subprocess.run(
-                ['docker', 'build', '-t', cls.IMAGE, '-f', 'nginx.dockerfile', '.'],
-                cwd=str(_HOME_DIR),
-                check=True,
-            )
+    def obtain_certificate(cls, domain, email, home_port):
+        """Run certbot standalone on home_port. The tunnel must already be open."""
+        for d in (cls.CONFIG_DIR, cls.WORK_DIR, cls.LOGS_DIR):
+            d.mkdir(parents=True, exist_ok=True)
 
-    @classmethod
-    def issue_certificate(cls, domain, email, cert_output_path):
-        client = docker.from_env()
-        try:
-            client.images.get(cls.IMAGE)
-        except docker.errors.ImageNotFound:
-            raise CertbotError(
-                f'Docker image "{cls.IMAGE}" not found. '
-                f'Build it first: docker build -t {cls.IMAGE} -f home/nginx.dockerfile home/'
-            )
-        container = client.containers.run(
-            cls.IMAGE,
-            detach=True,
-            ports={'80/tcp': 80},
-            volumes={cert_output_path: {'bind': cls.CERT_BASE, 'mode': 'rw'}},
+        proc = subprocess.run(
+            [
+                'certbot', 'certonly',
+                '--standalone',
+                '--non-interactive',
+                '--agree-tos',
+                '-m', email,
+                '-d', domain.name,
+                '--http-01-port', str(home_port),
+                '--config-dir', str(cls.CONFIG_DIR),
+                '--work-dir', str(cls.WORK_DIR),
+                '--logs-dir', str(cls.LOGS_DIR),
+            ],
+            capture_output=True,
+            text=True,
         )
-        try:
-            exit_code, output = container.exec_run(
-                [
-                    'certbot', 'certonly',
-                    '--webroot', '-w', cls.WEBROOT,
-                    '-d', domain,
-                    '--email', email,
-                    '--agree-tos',
-                    '--non-interactive',
-                ],
-            )
-            if exit_code != 0:
-                raise CertbotError(f'certbot failed (exit {exit_code}): {output.decode()}')
-            return {
-                'cert': f'{cert_output_path}/live/{domain}/fullchain.pem',
-                'key': f'{cert_output_path}/live/{domain}/privkey.pem',
-            }
-        finally:
-            container.stop()
-            container.remove()
+        if proc.returncode != 0:
+            raise CertbotError(f'certbot failed (exit {proc.returncode}):\n{proc.stderr}')
+
+        cert_path = cls.CONFIG_DIR / 'live' / domain.name / 'fullchain.pem'
+        expiry = cls.check_certificate(str(cert_path))
+        domain.cert_status = domain.CERT_VALID
+        domain.cert_expiry = expiry
+        domain.cert_path = str(cert_path)
+        domain.save()
 
     @classmethod
-    def check_certificate(cls, domain, cert_path):
+    def check_certificate(cls, cert_path):
         try:
             out = subprocess.check_output(
                 ['openssl', 'x509', '-enddate', '-noout', '-in', cert_path],

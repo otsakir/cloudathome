@@ -9,9 +9,7 @@
 
 {% if messages %}
   <ul>
-    {% for message in messages %}
-      <li><strong>{{ message }}</strong></li>
-    {% endfor %}
+    {% for message in messages %}<li><strong>{{ message }}</strong></li>{% endfor %}
   </ul>
 {% endif %}
 
@@ -35,6 +33,26 @@
     <button type="submit">Open tunnel</button>
   {% endif %}
 </form>
+
+<h2>Certificate</h2>
+{% with cert=object.domain.cert_status %}
+  <table>
+    <tr><th>Status</th><td>{{ object.domain.cert_status }}</td></tr>
+    <tr><th>Expiry</th><td>{{ object.domain.cert_expiry|default:"—" }}</td></tr>
+    <tr><th>Path</th><td>{{ object.domain.cert_path|default:"—" }}</td></tr>
+  </table>
+{% endwith %}
+
+{% if object.tunnel_status == 'open' %}
+  <form method="post" action="{% url 'issue_certificate' object.pk %}">
+    {% csrf_token %}
+    <label for="id_email">Email address</label>
+    <input type="email" name="email" id="id_email" required>
+    <button type="submit">Issue certificate</button>
+  </form>
+{% else %}
+  <p>Open the tunnel before issuing a certificate.</p>
+{% endif %}
 
 </body>
 </html>
