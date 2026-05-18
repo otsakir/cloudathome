@@ -28,11 +28,13 @@ class CloudConfig:
     ssh: SSHConfig
     port_base: int
     port_count: int
+    # Absolute path to the SQLite database file, resolved at load time.
+    database: Path = field(default_factory=lambda: Path('db.sqlite3'))
     certbot: CertbotConfig = field(default_factory=CertbotConfig)
 
 
 def load_config(path=None) -> CloudConfig:
-    resolved = Path(os.environ.get('CLOUDATHOME_CONFIG', '') or path or _DEFAULT_CONFIG_PATH)
+    resolved = Path(os.environ.get('HOME_CONFIG', '') or path or _DEFAULT_CONFIG_PATH)
     try:
         with open(resolved) as f:
             data = yaml.safe_load(f)
@@ -40,11 +42,15 @@ def load_config(path=None) -> CloudConfig:
         raise FileNotFoundError(
             f'CloudAtHome config not found at {resolved}. '
             'Run scripts/register_home.py to create it, or set the '
-            'CLOUDATHOME_CONFIG environment variable to the correct path.'
+            'HOME_CONFIG environment variable to the correct path.'
         )
     try:
         cl = data['cloudlink']
         certbot_data = data.get('certbot') or {}
+        db_path_str = data.get('database') or 'db.sqlite3'
+        db_path = Path(db_path_str)
+        if not db_path.is_absolute():
+            db_path = (resolved.parent / db_path).resolve()
         return CloudConfig(
             cloudserver_url=cl['cloudserver_url'],
             auth_token=cl['auth_token'],
@@ -52,6 +58,7 @@ def load_config(path=None) -> CloudConfig:
             ssh=SSHConfig(**cl['ssh']),
             port_base=cl['ports']['base'],
             port_count=cl['ports']['count'],
+            database=db_path,
             certbot=CertbotConfig(deploy_path=certbot_data.get('deploy_path')),
         )
     except (KeyError, TypeError) as e:
