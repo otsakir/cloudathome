@@ -15,6 +15,8 @@ class Domain(models.Model):
     cert_status = models.CharField(max_length=10, choices=CERT_STATUS_CHOICES, default=CERT_PENDING)
     cert_expiry = models.DateTimeField(null=True, blank=True)
     cert_path = models.CharField(max_length=512, blank=True)
+    deploy_path = models.CharField(max_length=512, blank=True,
+                                   help_text='Where to copy issued certificates. Overrides the global certbot.deploy_path. Relative paths are based on the home/ directory.')
 
     def __str__(self):
         return self.name

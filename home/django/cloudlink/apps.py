@@ -16,10 +16,13 @@ class CloudlinkConfig(AppConfig):
         except ValueError as e:
             raise SystemExit(f'\n[cloudlink] Invalid configuration: {e}\n')
         if not os.environ.get('RUN_MAIN'):
+            deploy_path = cfg.certbot.deploy_path or '(not set)'
             print(
                 f'\n[cloudlink]'
                 f'\n  cloud server : {cfg.cloudserver_url}'
                 f'\n  home slug    : {cfg.home_slug}'
                 f'\n  ssh          : {cfg.ssh.username}@{cfg.ssh.host}:{cfg.ssh.port}'
-                f'\n  key          : {cfg.ssh.private_key_path}\n'
+                f'\n  key          : {cfg.ssh.private_key_path}'
+                f'\n  database     : {cfg.database}'
+                f'\n  cert deploy  : {deploy_path}\n'
             )

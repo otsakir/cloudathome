@@ -47,6 +47,8 @@ def main():
                         help='Path to the SSH private key file')
     parser.add_argument('--ssh-port', type=int, default=8022,
                         help='SSH port on the cloud server (default: 8022)')
+    parser.add_argument('--database', type=str, default='db.sqlite3',
+                        help='Path to the SQLite database file (default: db.sqlite3, relative to config.yaml)')
     parser.add_argument('--output', '-o', type=Path, default=DEFAULT_OUTPUT,
                         help=f'Output path for config.yaml (default: {DEFAULT_OUTPUT})')
     args = parser.parse_args()
@@ -116,6 +118,7 @@ def main():
                 'count': home['port_count'],
             },
         },
+        'database': args.database,
     }
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

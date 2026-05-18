@@ -157,7 +157,30 @@ python manage.py runserver 0.0.0.0:8001
 
 The Home Console is available at `http://localhost:8001/`. Django reads `config.yaml` at startup. If the file is missing or malformed, startup fails immediately with a clear error message.
 
-> **Changing the config path:** Set the `CLOUDATHOME_CONFIG` environment variable to an absolute path if you want to keep `config.yaml` somewhere other than `home/`.
+> **Changing the config path:** Set the `HOME_CONFIG` environment variable to point at a different `config.yaml` if you want to keep it somewhere other than `home/`.
+
+### Portability
+
+The entire home-side state lives in four portable pieces:
+
+| Piece | Default location | Configured by |
+|-------|-----------------|---------------|
+| Connection config | `home/config.yaml` | `HOME_CONFIG` env var |
+| Database | `home/db.sqlite3` | `database` in config.yaml |
+| TLS certificates | `home/certbot/` | certbot working directory |
+| SSH key pair | `~/.ssh/cloudathome_ed25519` | `--private-key` / `ssh.private_key_path` |
+
+To move the Home Console to another machine: copy those four items, update any absolute paths in `config.yaml`, and run `python manage.py runserver` as usual.
+
+To switch between cloud servers (e.g. dev vs production), keep a separate `config.yaml` for each — with its own `database.path` — and select the active one with `HOME_CONFIG`:
+
+```bash
+# production
+python manage.py runserver 0.0.0.0:8001
+
+# dev cloud
+HOME_CONFIG=home/config-dev.yaml python manage.py runserver 0.0.0.0:8001
+```
 
 ### Obtaining a TLS certificate
 

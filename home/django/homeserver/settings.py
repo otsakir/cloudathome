@@ -73,11 +73,12 @@ WSGI_APPLICATION = 'homeserver.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
+# Path is read from config.yaml (database.path); relative paths resolve to the config.yaml directory.
+from cloudlink.config import get_config as _get_config  # noqa: E402
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': _get_config().database,
     }
 }
 
