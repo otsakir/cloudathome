@@ -17,7 +17,7 @@ class SSHConfig:
 
 @dataclass
 class CertbotConfig:
-    deploy_path: str | None = None
+    deploy_path: Path | None = None
 
 
 @dataclass
@@ -28,6 +28,8 @@ class CloudConfig:
     ssh: SSHConfig
     port_base: int
     port_count: int
+    # Directory containing the config file; used to resolve relative paths.
+    config_dir: Path = field(default_factory=Path.cwd)
     # Absolute path to the SQLite database file, resolved at load time.
     database: Path = field(default_factory=lambda: Path('db.sqlite3'))
     certbot: CertbotConfig = field(default_factory=CertbotConfig)
@@ -47,10 +49,17 @@ def load_config(path=None) -> CloudConfig:
     try:
         cl = data['cloudlink']
         certbot_data = data.get('certbot') or {}
-        db_path_str = data.get('database') or 'db.sqlite3'
-        db_path = Path(db_path_str)
-        if not db_path.is_absolute():
-            db_path = (resolved.parent / db_path).resolve()
+        config_dir = resolved.parent
+
+        def resolve(p):
+            path = Path(p)
+            return path if path.is_absolute() else (config_dir / path).resolve()
+
+        db_path = resolve(data.get('database') or 'db.sqlite3')
+
+        raw_deploy = certbot_data.get('deploy_path')
+        certbot_deploy = resolve(raw_deploy) if raw_deploy else None
+
         return CloudConfig(
             cloudserver_url=cl['cloudserver_url'],
             auth_token=cl['auth_token'],
@@ -58,8 +67,9 @@ def load_config(path=None) -> CloudConfig:
             ssh=SSHConfig(**cl['ssh']),
             port_base=cl['ports']['base'],
             port_count=cl['ports']['count'],
+            config_dir=config_dir,
             database=db_path,
-            certbot=CertbotConfig(deploy_path=certbot_data.get('deploy_path')),
+            certbot=CertbotConfig(deploy_path=certbot_deploy),
         )
     except (KeyError, TypeError) as e:
         raise ValueError(f'config.yaml is missing required field: {e}') from e

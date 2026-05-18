@@ -53,9 +53,14 @@ class CertbotService:
         domain.cert_path = str(cert_path)
         domain.save()
 
-        deploy_path = get_config().certbot.deploy_path
-        if deploy_path:
-            cls._deploy_certificates(domain.name, Path(deploy_path))
+        cfg = get_config()
+        if domain.deploy_path:
+            raw = Path(domain.deploy_path)
+            effective_deploy = raw if raw.is_absolute() else (cfg.config_dir / raw).resolve()
+        else:
+            effective_deploy = cfg.certbot.deploy_path  # already an absolute Path or None
+        if effective_deploy:
+            cls._deploy_certificates(domain.name, effective_deploy)
 
     @classmethod
     def _deploy_certificates(cls, domain_name, deploy_path):
