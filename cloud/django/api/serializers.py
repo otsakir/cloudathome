@@ -1,14 +1,7 @@
 import sys
 from rest_framework import serializers
-from homes.models import ProxyMapping, Home
+from homes.models import Home
 from homes.tunnels.manage_tunnel import tunnel_manager
-
-
-class ProxyMappingSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProxyMapping
-        fields = ['id', 'host', 'tunnel_port', 'scheme']
-        read_only_fields = ['id', 'tunnel_port']
 
 
 class HomeSerializer(serializers.Serializer):

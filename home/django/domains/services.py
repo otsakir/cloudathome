@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from cloudlink.config import get_config
+from cloudlink.services import CloudServerClient, CloudServerError
 
 # home/ directory
 _HOME_DIR = Path(__file__).resolve().parents[2]
@@ -120,5 +121,76 @@ class TunnelService:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
             pass  # process already gone, nothing to do
+
+
+class SyncService:
+
+    @staticmethod
+    def sync_entry(entry):
+        """Open tunnel + register cloud mapping for one entry. Idempotent."""
+        from domains.models import ProxyEntry
+        client = CloudServerClient()
+
+        # Remove any stale cloud mapping before re-creating it.
+        try:
+            client.delete_proxy_mapping(entry.cloudserver_host)
+        except Exception:
+            pass
+
+        try:
+            client.create_proxy_mapping(entry.cloudserver_host, entry.scheme)
+        except CloudServerError:
+            entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
+            entry.save()
+            raise
+
+        if not entry.tunnel_pid or not TunnelService.is_running(entry.tunnel_pid):
+            try:
+                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port)
+                entry.tunnel_pid = pid
+            except Exception:
+                entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
+                entry.save()
+                raise
+
+        entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
+        entry.save()
+
+    @staticmethod
+    def sync_all():
+        """Sync every ProxyEntry. Returns (succeeded, failed) counts."""
+        from domains.models import ProxyEntry
+        entries = list(ProxyEntry.objects.select_related('domain').all())
+        succeeded = 0
+        failed = 0
+        for entry in entries:
+            try:
+                SyncService.sync_entry(entry)
+                succeeded += 1
+            except Exception:
+                failed += 1
+        return succeeded, failed
+
+    @staticmethod
+    def disconnect_entry(entry):
+        """Close tunnel + remove cloud mapping for one entry."""
+        from domains.models import ProxyEntry
+        if entry.tunnel_pid:
+            TunnelService.close_tunnel(entry.tunnel_pid)
+        client = CloudServerClient()
+        try:
+            client.delete_proxy_mapping(entry.cloudserver_host)
+        except Exception:
+            pass
+        entry.tunnel_pid = None
+        entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
+        entry.save()
+
+    @staticmethod
+    def disconnect_all():
+        """Close tunnels and remove cloud mappings for every ProxyEntry."""
+        from domains.models import ProxyEntry
+        for entry in ProxyEntry.objects.all():
+            SyncService.disconnect_entry(entry)
 
 

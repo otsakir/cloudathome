@@ -6,7 +6,7 @@ from django.views.generic import ListView, DetailView, FormView
 from cloudlink.services import CloudServerClient, CloudServerError
 from domains.forms import AddDomainForm, IssueCertificateForm, ProxyEntryForm
 from domains.models import Domain, ProxyEntry
-from domains.services import CertbotError, CertbotService, TunnelService
+from domains.services import CertbotError, CertbotService, SyncService, TunnelService
 
 
 def _delete_proxy_entry(entry):
@@ -134,6 +134,34 @@ class DeleteProxyEntryView(View):
         domain_pk = entry.domain_id
         _delete_proxy_entry(entry)
         return redirect('domain_detail', pk=domain_pk)
+
+
+class SyncAllView(View):
+    def post(self, request):
+        succeeded, failed = SyncService.sync_all()
+        if failed:
+            messages.warning(request, f'Sync complete: {succeeded} succeeded, {failed} failed')
+        else:
+            messages.success(request, f'Sync complete: {succeeded} entries synced')
+        return redirect('domain_list')
+
+
+class DisconnectAllView(View):
+    def post(self, request):
+        SyncService.disconnect_all()
+        messages.success(request, 'All tunnels disconnected')
+        return redirect('domain_list')
+
+
+class SyncEntryView(View):
+    def post(self, request, pk):
+        entry = get_object_or_404(ProxyEntry, pk=pk)
+        try:
+            SyncService.sync_entry(entry)
+            messages.success(request, 'Entry synced successfully')
+        except Exception as e:
+            messages.error(request, f'Sync failed: {e}')
+        return redirect('proxy_entry_detail', pk=entry.pk)
 
 
 class TunnelToggleView(View):

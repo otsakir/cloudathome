@@ -9,7 +9,7 @@ from django.db import transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
-from homes.models import Home, ProxyMapping
+from homes.models import Home
 from homes.services import ElevatedOperations, HAProxyService
 from homes.tunnels.manage_tunnel import tunnel_manager
 from web.forms import SignupForm, RegisterHomeForm, AddMappingForm
@@ -66,8 +66,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context['home'] = home
         context['ssh_host'] = self.request.get_host().split(':')[0]
         if home:
-            context['home_port_base'] = tunnel_manager.get_home_port_base(home.home_index)
-            context['mappings'] = ProxyMapping.objects.filter(home=home)
+            port_base = tunnel_manager.get_home_port_base(home.home_index)
+            context['home_port_base'] = port_base
+            context['mappings'] = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.PORTS_PER_HOME)
         return context
 
 
@@ -182,34 +183,26 @@ class AddMappingView(HomeOwnerMixin, FormView):
         return context
 
     def form_valid(self, form):
-        home = self.get_home()
-        mapping = ProxyMapping.objects.create(
-            home=home,
-            host=form.cleaned_data['host'],
-            tunnel_port=form.cleaned_data['tunnel_port'],
-            scheme=form.cleaned_data['scheme'],
-        )
+        host = form.cleaned_data['host']
+        tunnel_port = form.cleaned_data['tunnel_port']
+        scheme = form.cleaned_data['scheme']
         try:
-            HAProxyService.add_mapping(mapping)
+            HAProxyService.add_mapping(host, tunnel_port, scheme)
         except Exception:
-            mapping.delete()
             messages.error(self.request, 'Failed to configure proxy.')
             return redirect('dashboard')
 
-        messages.success(self.request, f'Proxy mapping for {mapping.host} added.')
+        messages.success(self.request, f'Proxy mapping for {host} added.')
         return redirect('dashboard')
 
 
 class DeleteMappingView(HomeOwnerMixin, View):
     def post(self, request, host, *args, **kwargs):
-        home = get_object_or_404(Home, user=request.user)
-        mapping = get_object_or_404(ProxyMapping, host=host, home=home)
         try:
-            HAProxyService.remove_mapping(mapping)
+            HAProxyService.remove_mapping(host)
         except Exception:
             messages.error(request, 'Failed to remove proxy mapping.')
             return redirect('dashboard')
 
-        mapping.delete()
         messages.success(request, f'Proxy mapping for {host} deleted.')
         return redirect('dashboard')

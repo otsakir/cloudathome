@@ -23,10 +23,10 @@ A system that allows running application servers at home and making them reachab
 
 1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config.yaml`.
 2. The Home Console Django app is started. It reads `config.yaml` and is ready for use.
-3. The operator adds a domain and a proxy entry in the Home Console. The proxy entry registers the cloud proxy mapping and records the allocated tunnel port.
+3. The operator adds a domain and a proxy entry in the Home Console. This registers the mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally.
 4. The operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
 5. The operator closes the temporary tunnel if needed, or keeps it open for production traffic.
-5. Incoming HTTPS traffic hits HAProxy on port 443, which routes it by SNI hostname through the tunnel to the home service.
+6. Incoming HTTPS traffic hits HAProxy on port 443, which routes it by SNI hostname through the tunnel to the home service.
 
 
 ## Cloud server
@@ -72,8 +72,7 @@ The API is browsable via Swagger UI when running in debug mode:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/admin/proxy-mappings/sync` | Re-sync all DB mappings to HAProxy |
-| GET | `/api/admin/proxy-mappings/haproxy` | Dump current live HAProxy SNI map |
+| GET | `/api/admin/proxy-mappings/haproxy` | Dump current live HAProxy map entries |
 | POST | `/api/admin/homes/sync` | Reconcile DB homes with system SSH users |
 
 ---
@@ -198,7 +197,31 @@ The domain record is updated with the certificate path and expiry date on succes
 
 ### Managing tunnels
 
-Each proxy entry detail page has an **Open tunnel / Close tunnel** button. Tunnels are OS-level SSH processes; their PIDs are stored in the database so they can be stopped cleanly even after a Django restart. If a tunnel process dies unexpectedly, the status is corrected automatically the next time the proxy entry page is loaded.
+Tunnels are OS-level SSH processes. Their PIDs are stored in the database so they can be stopped cleanly even after a Django restart. If a tunnel process dies unexpectedly, the status is corrected automatically the next time the proxy entry page is loaded.
+
+**Per-entry controls** (proxy entry detail page):
+- **Open tunnel / Close tunnel** — manually open or close a single tunnel.
+- **Sync** — idempotent reconnect: re-registers the cloud proxy mapping and reopens the tunnel if it is not running. Use this to recover a single entry after a crash or restart.
+
+**Global controls** (domain list page):
+- **Sync all** — syncs every proxy entry at once. The intended way to restore all tunnels after the Home Console restarts.
+- **Disconnect all** — closes all tunnels and removes all cloud proxy mappings cleanly.
+
+**Management command** — the same sync operations are available from the command line:
+
+```bash
+# Sync all entries
+python manage.py sync_tunnels
+
+# Sync one entry by domain name
+python manage.py sync_tunnels --domain mysite.example.com
+
+# Disconnect all entries
+python manage.py sync_tunnels --disconnect
+
+# Disconnect one entry
+python manage.py sync_tunnels --domain mysite.example.com --disconnect
+```
 
 ---
 
@@ -254,7 +277,7 @@ From the proxy entry detail page click **Open tunnel**, then enter your email an
 
 ### 8. Open the tunnel for production traffic
 
-Click **Open tunnel** on the proxy entry (if you closed it after cert issuance).
+Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Sync all** on the domain list to restore all tunnels at once. After any future Home Console restart, **Sync all** is the quickest way to bring everything back up.
 
 ### 9. Test
 

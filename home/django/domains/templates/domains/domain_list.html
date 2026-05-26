@@ -5,6 +5,21 @@
 <h1>Domains</h1>
 <p><a href="{% url 'add_domain' %}">Add domain</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
 
+{% if messages %}
+  <ul>
+    {% for message in messages %}<li><strong>{{ message }}</strong></li>{% endfor %}
+  </ul>
+{% endif %}
+
+<form method="post" action="{% url 'sync_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Sync all</button>
+</form>
+<form method="post" action="{% url 'disconnect_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Disconnect all</button>
+</form>
+
 {% if domains %}
   <table>
     <thead>

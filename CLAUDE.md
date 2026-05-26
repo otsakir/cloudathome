@@ -67,8 +67,8 @@ sudo python cloud/django/homes/tunnels/manage_tunnel.py reload
 1. A home network registers by `POST /api/homes/` with its SSH public key.
 2. Django calls `ElevatedOperations.add_home_user()` (in `homes/services.py`), which sudo-executes `manage_tunnel.py`.
 3. `manage_tunnel.py` creates a system user (`home<ID>_<username>`), installs the SSH key, and configures per-user `sshd` restrictions (TCP-forward only, no TTY/shell, allowed port range 2000–2099).
-4. The home network's gateway then opens an SSH reverse tunnel on the assigned port.
-5. A proxy mapping is created via `POST /api/proxy-mappings/`, which updates the HAProxy SNI map via the Runtime API socket — no reload needed.
+4. The home network's gateway opens an SSH reverse tunnel on the assigned port.
+5. The home calls `POST /api/homes/<slug>/proxy-mappings/` with a hostname and scheme. The cloud allocates a free port from the home's range, updates the HAProxy map via the Runtime API, and returns the allocated port. No mapping state is persisted in the cloud database.
 6. HAProxy routes incoming HTTPS traffic by SNI hostname to the matching tunnel backend.
 
 ### Key design points
@@ -78,7 +78,7 @@ sudo python cloud/django/homes/tunnels/manage_tunnel.py reload
 - **Max homes**: 10 (indices 0–9), enforced in the `Home` model.
 - **Username format**: `home<XX>_<django_username>` (e.g. `home00_alice`). The Django username is the SSH suffix.
 - **Public keys** are staged to `/var/tunnelagent/public_keys/` before being passed to `manage_tunnel.py`.
-- **HAProxy routing**: 100 tunnel backends are pre-created in `haproxy.cfg` (one per port, ports 2000–2009, 2100–2109, … 2900–2909). SNI hostname → backend name mappings are stored in `sni_backends.map` and updated at runtime via the HAProxy Runtime API on port 9999. On Django startup, the `sync_proxy_mappings` management command repopulates the maps from the database.
+- **HAProxy routing**: 100 tunnel backends are pre-created in `haproxy.cfg` (one per port, ports 2000–2009, 2100–2109, … 2900–2909). SNI hostname → backend name mappings are stored in `sni_backends.map` and updated at runtime via the HAProxy Runtime API on port 9999. The maps start empty on each container start; homes are responsible for re-registering their mappings after a restart.
 - **Home ownership**: `Home.user` is a FK to Django's `User` with `PROTECT` — a user cannot be deleted while they have assigned homes.
 
 ### Source layout
@@ -104,12 +104,11 @@ cloud/
     │   └── settings/
     │       ├── local_settings.py
     │       └── docker_settings.py
-    ├── homes/                            # Domain layer: Home + ProxyMapping models and services
-    │   ├── models.py                     # Home, ProxyMapping
+    ├── homes/                            # Domain layer: Home model and services
+    │   ├── models.py                     # Home
     │   ├── services.py                   # HAProxyService, ElevatedOperations (sudo wrapper)
     │   ├── management/commands/
-    │   │   ├── reconcile_tunnel_users.py # Recreates missing system users on startup
-    │   │   └── sync_proxy_mappings.py    # Restores HAProxy maps from DB on startup
+    │   │   └── reconcile_tunnel_users.py # Recreates missing system users on startup
     │   ├── tests/                        # Tests for tunnel management
     │   └── tunnels/
     │       └── manage_tunnel.py          # Core tunnel user management script
@@ -129,12 +128,11 @@ cloud/
 |--------|----------|-------------|
 | GET | `/api/homes/` | List caller's assigned homes (auth required) |
 | POST | `/api/homes/` | Claim a home slot and install SSH key |
-| DELETE | `/api/homes/<id>/` | Release a home slot |
-| GET | `/api/proxy-mappings/` | List caller's proxy mappings (auth required) |
-| POST | `/api/proxy-mappings/` | Create a forwarding rule and update HAProxy map |
-| DELETE | `/api/proxy-mappings/<slug>/` | Remove a forwarding rule and update HAProxy map |
-| POST | `/api/admin/proxy-mappings/sync` | Re-sync all DB mappings to HAProxy (admin only) |
-| GET | `/api/admin/proxy-mappings/haproxy` | Dump current HAProxy SNI map entries (admin only) |
+| DELETE | `/api/homes/<slug>/` | Release a home slot |
+| GET | `/api/homes/<slug>/proxy-mappings/` | List caller's active HAProxy mappings |
+| POST | `/api/homes/<slug>/proxy-mappings/` | Allocate a tunnel port and register in HAProxy |
+| DELETE | `/api/homes/<slug>/proxy-mappings/<host>/` | Remove a forwarding rule from HAProxy |
+| GET | `/api/admin/proxy-mappings/haproxy` | Dump current live HAProxy map entries (admin only) |
 | POST | `/api/admin/homes/sync` | Reconcile DB homes with system users (admin only) |
 
-Authentication is session-based. All endpoints require a logged-in user. Proxy mappings are scoped to the caller's own homes.
+Authentication is session-based or token-based. All endpoints require a logged-in user. Proxy mappings are scoped to the caller's own home slot.

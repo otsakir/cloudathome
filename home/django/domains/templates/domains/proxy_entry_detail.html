@@ -23,7 +23,7 @@
 </table>
 
 <h2>Tunnel</h2>
-<form method="post" action="{% url 'tunnel_toggle' object.pk %}">
+<form method="post" action="{% url 'tunnel_toggle' object.pk %}" style="display:inline">
   {% csrf_token %}
   {% if object.tunnel_status == 'open' %}
     <button type="submit">Close tunnel</button>
@@ -32,6 +32,10 @@
   {% else %}
     <button type="submit">Open tunnel</button>
   {% endif %}
+</form>
+<form method="post" action="{% url 'sync_entry' object.pk %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Sync</button>
 </form>
 
 <h2>Certificate</h2>
