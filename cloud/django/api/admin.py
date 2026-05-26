@@ -1,5 +1,4 @@
 from django.contrib import admin
-from homes.models import Home, ProxyMapping
+from homes.models import Home
 
 admin.site.register(Home)
-admin.site.register(ProxyMapping)

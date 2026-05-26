@@ -1,14 +1,11 @@
 import sys
 import secrets
 
-from rest_framework.generics import ListAPIView, CreateAPIView, ListCreateAPIView, RetrieveDestroyAPIView
+from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView
 from rest_framework.views import APIView
-from homes.models import ProxyMapping, Home
-from .serializers import ProxyMappingSerializer, HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer
-# from haproxyadmin.haproxy import HAProxy
-from django.http import HttpRequest
+from homes.models import Home
+from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer
 from django.shortcuts import get_object_or_404
-from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework import status
 from homes.services import ElevatedOperations
@@ -104,64 +101,52 @@ class HomeListCreateAPIView(ListCreateAPIView):
         return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
 
 
-class ProxyMappingListCreateView(ListCreateAPIView):
+class ProxyMappingListCreateView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    serializer_class = ProxyMappingSerializer
 
-    def get_home(self):
-        return get_object_or_404(Home, slug=self.kwargs['home_slug'], user=self.request.user)
+    def _get_home(self, home_slug, user):
+        return get_object_or_404(Home, slug=home_slug, user=user)
 
-    def get_queryset(self):
-        return ProxyMapping.objects.filter(home=self.get_home())
+    def get(self, request, home_slug):
+        home = self._get_home(home_slug, request.user)
+        port_base = tunnel_manager.get_home_port_base(home.home_index)
+        mappings = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.PORTS_PER_HOME)
+        return Response(mappings)
 
-    def create(self, request, *args, **kwargs):
-        home = self.get_home()
-        serializer = ProxyMappingSerializer(data=request.data, context={'home': home})
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, home_slug):
+        home = self._get_home(home_slug, request.user)
+        host = request.data.get('host')
+        scheme = request.data.get('scheme')
+        if not host or scheme not in ('http', 'https'):
+            return Response({'message': 'host and scheme (http or https) are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Allocate the next free port within this home's assigned range
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
-        used = set(ProxyMapping.objects.filter(home=home).values_list('tunnel_port', flat=True))
+        used = HAProxyService.get_used_ports()
         try:
             tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
         except StopIteration:
             return Response({'message': 'no free tunnel ports available'}, status=status.HTTP_409_CONFLICT)
 
-        mapping = serializer.save(home=home, tunnel_port=tunnel_port)
-
         try:
-            HAProxyService.add_mapping(mapping)
+            HAProxyService.add_mapping(host, tunnel_port, scheme)
         except Exception:
-            mapping.delete()
             return Response({'message': 'failed to configure proxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response(ProxyMappingSerializer(mapping).data, status=status.HTTP_201_CREATED)
+        return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme}, status=status.HTTP_201_CREATED)
 
 
-class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
+class ProxyMappingDestroyAPIView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    serializer_class = ProxyMappingSerializer
-    lookup_field = 'host'
 
-    def get_queryset(self):
-        return ProxyMapping.objects.filter(
-            home__slug=self.kwargs['home_slug'],
-            home__user=self.request.user,
-        )
-
-    def destroy(self, request, *args, **kwargs):
-        mapping = self.get_object()
-
+    def delete(self, request, home_slug, host):
+        get_object_or_404(Home, slug=home_slug, user=request.user)
         try:
-            HAProxyService.remove_mapping(mapping)
+            HAProxyService.remove_mapping(host)
         except Exception:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        mapping.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -169,19 +154,6 @@ class ProxyMappingDestroyAPIView(RetrieveDestroyAPIView):
 class ProxyInstanceAPIView(APIView):
     def get(self, request):
         pass
-
-
-class ProxyMappingSyncView(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
-    permission_classes = [IsAdminUser]
-
-    def post(self, request):
-        mappings = list(ProxyMapping.objects.select_related('home').all())
-        try:
-            HAProxyService.sync_mappings(mappings)
-        except Exception:
-            return Response({'message': 'failed to sync proxy mappings'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({'synced': len(mappings)})
 
 
 class ProxyMappingDumpView(APIView):

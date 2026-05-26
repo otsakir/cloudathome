@@ -13,9 +13,6 @@ chown -R django:django /opt/backend-var
 # recreate any system SSH users that are in the database but missing from the container
 su-exec django python /opt/app/manage.py reconcile_tunnel_users
 
-# restore HAProxy SNI mappings from the database (haproxy is guaranteed healthy before this runs)
-su-exec django python /opt/app/manage.py sync_proxy_mappings
-
 # run django
 su-exec django /opt/app/manage.py runserver 0.0.0.0:8000 &
 
