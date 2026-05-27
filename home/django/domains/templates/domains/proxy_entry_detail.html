@@ -18,7 +18,16 @@
   <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
   <tr><th>Scheme</th><td>{{ object.scheme|upper }}</td></tr>
   <tr><th>Tunnel port</th><td>{{ object.tunnel_port }}</td></tr>
-  <tr><th>Home port</th><td>{{ object.home_port }}</td></tr>
+  <tr><th>Home network host</th><td>{{ object.home_host }}</td></tr>
+  <tr>
+    <th>Home port</th>
+    <td>
+      {{ object.home_port }}
+      {% if home_port_open is not None %}
+        — {% if home_port_open %}listening{% else %}not listening{% endif %}
+      {% endif %}
+    </td>
+  </tr>
   <tr><th>Tunnel status</th><td>{{ object.tunnel_status }}</td></tr>
 </table>
 

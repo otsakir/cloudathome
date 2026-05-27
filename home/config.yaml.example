@@ -38,3 +38,8 @@ database: db.sqlite3
 #   # Optional: copy issued certificates to this directory after issuance.
 #   # Certificates are placed under <deploy_path>/<domain>/{fullchain,privkey,chain,cert}.pem
 #   deploy_path: /etc/nginx/certs
+
+# features:
+#   # Allow proxy entries to forward to hosts other than localhost on the home network.
+#   # Disabled by default; set to true to expose the home_host field when adding a proxy entry.
+#   lan_forwarding: false

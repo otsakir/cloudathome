@@ -16,6 +16,13 @@ class ProxyEntryForm(forms.Form):
         choices=ProxyEntry.SCHEME_CHOICES,
         label='Scheme',
     )
+    home_host = forms.CharField(
+        max_length=253,
+        initial='localhost',
+        required=False,
+        label='Home network host',
+        help_text='Hostname or IP of the target service on the home network.',
+    )
     home_port = forms.IntegerField(
         label='Home port',
         help_text='Port of the local service (e.g. 443 for HTTPS).',

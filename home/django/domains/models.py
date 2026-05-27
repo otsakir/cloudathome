@@ -45,10 +45,16 @@ class ProxyEntry(models.Model):
     domain = models.OneToOneField(Domain, on_delete=models.CASCADE, related_name='proxy_entry')
     cloudserver_host = models.CharField(max_length=253, unique=True)
     tunnel_port = models.IntegerField()
+    home_host = models.CharField(max_length=253, default='localhost')
     home_port = models.IntegerField()
     scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
     tunnel_pid = models.IntegerField(null=True, blank=True)
     tunnel_status = models.CharField(max_length=6, choices=TUNNEL_STATUS_CHOICES, default=TUNNEL_CLOSED)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['home_host', 'home_port'], name='unique_home_host_port'),
+        ]
+
     def __str__(self):
-        return f'{self.cloudserver_host} → :{self.home_port} ({self.scheme})'
+        return f'{self.cloudserver_host} → {self.home_host}:{self.home_port} ({self.scheme})'
