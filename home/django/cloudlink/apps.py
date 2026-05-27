@@ -1,7 +1,18 @@
 import os
 
 from django.apps import AppConfig
+from threading import Thread
 
+# run this inside a thread to make sure everything is in place after it runs
+def _sync_mappings():
+    from domains.services import SyncService
+
+    if not os.environ.get('RUN_MAIN'):
+        ok_count, nok_count = SyncService.sync_all()
+        print(f'\n[sync mappings]'
+              f'\n succeeded  : {ok_count}'
+              f'\n failed     : {nok_count}'
+              )
 
 class CloudlinkConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -26,3 +37,6 @@ class CloudlinkConfig(AppConfig):
                 f'\n  database     : {cfg.database}'
                 f'\n  cert deploy  : {deploy_path}\n'
             )
+
+        # sync proxy mappings with cloud side
+        Thread(target=_sync_mappings, daemon=True).start()
