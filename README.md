@@ -199,6 +199,8 @@ The domain record is updated with the certificate path and expiry date on succes
 
 Tunnels are OS-level SSH processes. Their PIDs are stored in the database so they can be stopped cleanly even after a Django restart. If a tunnel process dies unexpectedly, the status is corrected automatically the next time the proxy entry page is loaded.
 
+SSH process output (stdout/stderr) is inherited from the Django process and appears directly in the Home Console's terminal. For example, if the local service is not yet listening on its port, you will see repeated `connect_to localhost port <N>: failed.` lines — these come from SSH, not Django.
+
 **Per-entry controls** (proxy entry detail page):
 - **Open tunnel / Close tunnel** — manually open or close a single tunnel.
 - **Sync** — idempotent reconnect: re-registers the cloud proxy mapping and reopens the tunnel if it is not running. Use this to recover a single entry after a crash or restart.
