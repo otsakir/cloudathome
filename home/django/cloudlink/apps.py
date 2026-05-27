@@ -37,6 +37,10 @@ class CloudlinkConfig(AppConfig):
                 f'\n  database     : {cfg.database}'
                 f'\n  cert deploy  : {deploy_path}\n'
             )
+            print(
+                f'[features]'
+                f'\n  lan forwarding : {cfg.features.lan_forwarding}\n'
+            )
 
         # sync proxy mappings with cloud side
         Thread(target=_sync_mappings, daemon=True).start()

@@ -14,7 +14,19 @@ Open the tunnel separately after creation.</p>
 
 <form method="post">
   {% csrf_token %}
-  <table>{{ form.as_table }}</table>
+  <table>
+    {{ form.scheme.label_tag }}<br>{{ form.scheme }}
+    {% if form.scheme.errors %}<ul>{% for e in form.scheme.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    <br>
+    {% if lan_forwarding %}
+      {{ form.home_host.label_tag }}<br>{{ form.home_host }}
+      {% if form.home_host.errors %}<ul>{% for e in form.home_host.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      <small>{{ form.home_host.help_text }}</small><br><br>
+    {% endif %}
+    {{ form.home_port.label_tag }}<br>{{ form.home_port }}
+    {% if form.home_port.errors %}<ul>{% for e in form.home_port.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    <small>{{ form.home_port.help_text }}</small>
+  </table>
   <button type="submit">Create</button>
 </form>
 </body>

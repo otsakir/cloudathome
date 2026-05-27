@@ -21,6 +21,11 @@ class CertbotConfig:
 
 
 @dataclass
+class FeaturesConfig:
+    lan_forwarding: bool = False
+
+
+@dataclass
 class CloudConfig:
     cloudserver_url: str
     auth_token: str
@@ -33,6 +38,7 @@ class CloudConfig:
     # Absolute path to the SQLite database file, resolved at load time.
     database: Path = field(default_factory=lambda: Path('db.sqlite3'))
     certbot: CertbotConfig = field(default_factory=CertbotConfig)
+    features: FeaturesConfig = field(default_factory=FeaturesConfig)
 
 
 def load_config(path=None) -> CloudConfig:
@@ -60,6 +66,11 @@ def load_config(path=None) -> CloudConfig:
         raw_deploy = certbot_data.get('deploy_path')
         certbot_deploy = resolve(raw_deploy) if raw_deploy else None
 
+        features_data = data.get('features') or {}
+        features = FeaturesConfig(
+            lan_forwarding=bool(features_data.get('lan_forwarding', False)),
+        )
+
         return CloudConfig(
             cloudserver_url=cl['cloudserver_url'],
             auth_token=cl['auth_token'],
@@ -70,6 +81,7 @@ def load_config(path=None) -> CloudConfig:
             config_dir=config_dir,
             database=db_path,
             certbot=CertbotConfig(deploy_path=certbot_deploy),
+            features=features,
         )
     except (KeyError, TypeError) as e:
         raise ValueError(f'config.yaml is missing required field: {e}') from e

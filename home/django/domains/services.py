@@ -101,11 +101,16 @@ class TunnelService:
             return False
 
     @staticmethod
-    def open_tunnel(tunnel_port, home_port):
+    def open_tunnel(tunnel_port, home_port, home_host='localhost'):
         cfg = get_config()
+        if home_host not in ('localhost', '127.0.0.1', '::1') and not cfg.features.lan_forwarding:
+            raise PermissionError(
+                f'Tunnel to home network host "{home_host}" is blocked: '
+                'enable features.lan_forwarding in config.yaml to allow it.'
+            )
         proc = subprocess.Popen([
             'ssh', '-N',
-            '-R', f'{tunnel_port}:localhost:{home_port}',
+            '-R', f'{tunnel_port}:{home_host}:{home_port}',
             '-i', str(cfg.ssh.private_key_path),
             '-o', 'StrictHostKeyChecking=accept-new',
             '-o', 'ServerAliveInterval=30',
@@ -114,6 +119,17 @@ class TunnelService:
             f'{cfg.ssh.username}@{cfg.ssh.host}',
         ])
         return proc.pid
+
+    @staticmethod
+    def is_home_port_open(home_host: str, home_port: int) -> bool | None:
+        """Check if home_port is listening. Returns None for non-localhost targets."""
+        if home_host not in ('localhost', '127.0.0.1', '::1'):
+            return None
+        import psutil
+        return any(
+            c.laddr.port == home_port and c.status == psutil.CONN_LISTEN
+            for c in psutil.net_connections(kind='tcp')
+        )
 
     @staticmethod
     def close_tunnel(pid):
@@ -138,7 +154,8 @@ class SyncService:
             pass
 
         try:
-            client.create_proxy_mapping(entry.cloudserver_host, entry.scheme)
+            result = client.create_proxy_mapping(entry.cloudserver_host, entry.scheme)
+            entry.tunnel_port = result['tunnel_port']
         except CloudServerError:
             entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
             entry.save()
@@ -146,7 +163,7 @@ class SyncService:
 
         if not entry.tunnel_pid or not TunnelService.is_running(entry.tunnel_pid):
             try:
-                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port)
+                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port, entry.home_host)
                 entry.tunnel_pid = pid
             except Exception:
                 entry.tunnel_status = ProxyEntry.TUNNEL_ERROR

@@ -16,4 +16,4 @@ class DomainAdmin(admin.ModelAdmin):
 
 @admin.register(ProxyEntry)
 class ProxyEntryAdmin(admin.ModelAdmin):
-    list_display = ('cloudserver_host', 'domain', 'tunnel_port', 'home_port', 'scheme', 'tunnel_status')
+    list_display = ('domain', 'tunnel_port', 'home_host', 'home_port', 'scheme', 'tunnel_status')

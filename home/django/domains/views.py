@@ -65,11 +65,25 @@ class ProxyEntryCreateView(FormView):
         self.domain = get_object_or_404(Domain, pk=kwargs['domain_pk'])
 
     def get_context_data(self, **kwargs):
+        from cloudlink.config import get_config
         context = super().get_context_data(**kwargs)
         context['domain'] = self.domain
+        context['lan_forwarding'] = get_config().features.lan_forwarding
         return context
 
     def form_valid(self, form):
+        from cloudlink.config import get_config
+        cfg = get_config()
+        if cfg.features.lan_forwarding:
+            home_host = form.cleaned_data.get('home_host') or 'localhost'
+        else:
+            home_host = 'localhost'
+        home_port = form.cleaned_data['home_port']
+
+        if ProxyEntry.objects.filter(home_host=home_host, home_port=home_port).exists():
+            form.add_error(None, f'{home_host}:{home_port} is already used by another proxy entry.')
+            return self.form_invalid(form)
+
         client = CloudServerClient()
         try:
             result = client.create_proxy_mapping(self.domain.name, form.cleaned_data['scheme'])
@@ -81,7 +95,8 @@ class ProxyEntryCreateView(FormView):
             domain=self.domain,
             cloudserver_host=self.domain.name,
             tunnel_port=result['tunnel_port'],
-            home_port=form.cleaned_data['home_port'],
+            home_host=home_host,
+            home_port=home_port,
             scheme=form.cleaned_data['scheme'],
         )
         return redirect('proxy_entry_detail', pk=entry.pk)
@@ -100,6 +115,12 @@ class ProxyEntryDetailView(DetailView):
                 entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
                 entry.save()
         return entry
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        entry = self.object
+        context['home_port_open'] = TunnelService.is_home_port_open(entry.home_host, entry.home_port)
+        return context
 
 
 class IssueCertificateView(FormView):
@@ -174,7 +195,7 @@ class TunnelToggleView(View):
             entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED
         else:
             try:
-                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port)
+                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port, entry.home_host)
                 entry.tunnel_pid = pid
                 entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
             except Exception as e:
