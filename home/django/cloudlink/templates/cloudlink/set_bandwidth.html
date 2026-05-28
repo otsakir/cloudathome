@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head><title>Set Bandwidth Limit</title></head>
+<body>
+<h1>Bandwidth Limit</h1>
+<p>Controls how much of your home internet upload the tunnel services can consume.</p>
+
+{% if form.non_field_errors %}
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  <p>
+    {{ form.bandwidth_limit_kbps.label_tag }}<br>
+    {{ form.bandwidth_limit_kbps }}
+    {% if form.bandwidth_limit_kbps.errors %}
+      <span>{{ form.bandwidth_limit_kbps.errors|join:", " }}</span>
+    {% endif %}
+    <br><small>{{ form.bandwidth_limit_kbps.help_text }}</small>
+  </p>
+  <button type="submit">Save</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+</body>
+</html>

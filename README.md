@@ -195,6 +195,41 @@ Certificate issuance is tied to a proxy entry. The full sequence from the Home C
 
 The domain record is updated with the certificate path and expiry date on success.
 
+### Bandwidth throttling
+
+Per-home bandwidth limits cap how much of the home's internet upload the cloud tunnel can consume. Limits are enforced on the cloud server using Linux `tc` (HTB) and `iptables`; TCP backpressure through the SSH connection naturally bounds the home-side upload rate.
+
+#### How enforcement works
+
+When a limit is set the cloud server runs the following for the home's assigned port range:
+
+```
+tc qdisc add dev eth0 root handle 1: htb default 999
+tc class add dev eth0 parent 1: classid 1:<N> htb rate <X>kbit ceil <X>kbit
+tc filter add dev eth0 parent 1: handle <N> fw classid 1:<N>
+iptables -t mangle -A OUTPUT -p tcp --sport <port_low>:<port_high> -j MARK --set-mark <N>
+```
+
+All egress TCP traffic sourced from the home's tunnel port range is marked, then shaped through the HTB leaf class at the configured rate. Unrelated traffic is unaffected.
+
+#### Reconciliation on restart
+
+On container start the `reconcile_bandwidth` management command re-applies all limits from the database, since `tc` and `iptables` rules do not survive a container restart.
+
+#### API
+
+A home owner sets or clears the limit via `PATCH /api/homes/<slug>/`:
+
+```
+PATCH /api/homes/<slug>/
+{"bandwidth_limit_kbps": 5000}   # set to 5 Mbit/s
+{"bandwidth_limit_kbps": null}   # remove limit (unlimited)
+```
+
+Accepted range: 100 – 10,000,000 kbps. `null` means unlimited.
+
+---
+
 ### Managing tunnels
 
 Tunnels are OS-level SSH processes. Their PIDs are stored in the database so they can be stopped cleanly even after a Django restart. If a tunnel process dies unexpectedly, the status is corrected automatically the next time the proxy entry page is loaded.

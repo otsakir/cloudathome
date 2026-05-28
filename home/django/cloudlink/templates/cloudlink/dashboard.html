@@ -11,6 +11,13 @@
   <tr><th>SSH username</th><td>{{ config.ssh.username }}</td></tr>
   <tr><th>SSH host</th><td>{{ config.ssh.host }}:{{ config.ssh.port }}</td></tr>
   <tr><th>Port range</th><td>{{ config.port_base }} – {{ config.port_base|add:config.port_count|add:"-1" }}</td></tr>
+  <tr>
+    <th>Bandwidth limit</th>
+    <td>
+      {% if bandwidth_limit_kbps %}{{ bandwidth_limit_kbps }} kbps{% else %}Unlimited{% endif %}
+      &nbsp;<a href="{% url 'set_bandwidth' %}">Change</a>
+    </td>
+  </tr>
 </table>
 
 <h2>Domains</h2>
