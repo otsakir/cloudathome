@@ -9,6 +9,11 @@ import sys
 from pathlib import Path
 
 
+def _run(args, **kwargs):
+    print(f'[manage_home] {" ".join(str(a) for a in args)}', file=sys.stderr)
+    return subprocess.run(args, **kwargs)
+
+
 class Config:
 
     PORTS_PER_HOME = 10
@@ -130,7 +135,7 @@ class TunnelManager:
         return self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
 
     def create_tunnel_user(self, username: str, public_key_filename: str):
-        result = subprocess.run(['adduser', '-D', username])
+        result = _run(['adduser', '-D', username])
         if result.returncode != 0:
             raise UserError('error creating user')
 
@@ -145,7 +150,7 @@ class TunnelManager:
         shutil.chown(f'/home/{username}/.ssh/authorized_keys', username, username)
 
     def drop_tunnel_user(self, username: str):
-        result = subprocess.run(['deluser', username])
+        result = _run(['deluser', username])
         if result.returncode != 0:
             print(f'could not remove user {username}, assuming already absent', file=sys.stderr)
         assert username.startswith(self.config.HOME_PREFIX)
@@ -160,7 +165,7 @@ class TunnelManager:
 
     def reload_sshd_config(self):
         sshd_pid = self.get_sshd_pid()
-        result = subprocess.run(['kill', '-HUP', str(sshd_pid)])
+        result = _run(['kill', '-HUP', str(sshd_pid)])
         if result.returncode != 0:
             raise HomeScriptError('error reloading sshd configuration')
 
@@ -172,7 +177,7 @@ class TunnelManager:
 
     def enable_user(self, username: str):
         # Pass credentials via stdin to avoid shell=True with username interpolation.
-        result = subprocess.run(
+        result = _run(
             ['chpasswd', '-e'],
             input=f'{username}:*\n',
             text=True,
@@ -205,20 +210,20 @@ class BandwidthManager:
         return base, base + self.config.PORTS_PER_HOME - 1
 
     def _ensure_root_qdisc(self):
-        result = subprocess.run(
-            ['tc', 'qdisc', 'show', 'dev', self._iface()],
+        result = _run(
+            ['/sbin/tc', 'qdisc', 'show', 'dev', self._iface()],
             capture_output=True, text=True,
         )
         if 'htb 1:' not in result.stdout:
-            subprocess.run(
-                ['tc', 'qdisc', 'add', 'dev', self._iface(),
+            _run(
+                ['/sbin/tc', 'qdisc', 'add', 'dev', self._iface(),
                  'root', 'handle', '1:', 'htb', 'default', '999'],
                 check=True,
             )
 
     def _class_exists(self, home_id: int) -> bool:
-        result = subprocess.run(
-            ['tc', 'class', 'show', 'dev', self._iface()],
+        result = _run(
+            ['/sbin/tc', 'class', 'show', 'dev', self._iface()],
             capture_output=True, text=True,
         )
         return self._classid(home_id) in result.stdout
@@ -233,26 +238,26 @@ class BandwidthManager:
         port_lo, port_hi = self._port_range(home_id)
 
         if self._class_exists(home_id):
-            subprocess.run(
-                ['tc', 'class', 'change', 'dev', iface,
+            _run(
+                ['/sbin/tc', 'class', 'change', 'dev', iface,
                  'parent', '1:', 'classid', classid,
                  'htb', 'rate', rate, 'ceil', rate],
                 check=True,
             )
         else:
-            subprocess.run(
-                ['tc', 'class', 'add', 'dev', iface,
+            _run(
+                ['/sbin/tc', 'class', 'add', 'dev', iface,
                  'parent', '1:', 'classid', classid,
                  'htb', 'rate', rate, 'ceil', rate],
                 check=True,
             )
-            subprocess.run(
-                ['tc', 'filter', 'add', 'dev', iface,
+            _run(
+                ['/sbin/tc', 'filter', 'add', 'dev', iface,
                  'parent', '1:', 'handle', str(mark), 'fw', 'classid', classid],
                 check=True,
             )
-            subprocess.run(
-                ['iptables', '-t', 'mangle', '-A', 'OUTPUT',
+            _run(
+                ['/usr/sbin/iptables', '-t', 'mangle', '-A', 'OUTPUT',
                  '-p', 'tcp',
                  '--sport', f'{port_lo}:{port_hi}',
                  '-j', 'MARK', '--set-mark', str(mark)],
@@ -265,19 +270,19 @@ class BandwidthManager:
         mark = self._mark(home_id)
         port_lo, port_hi = self._port_range(home_id)
 
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-D', 'OUTPUT',
+        _run(
+            ['/usr/sbin/iptables', '-t', 'mangle', '-D', 'OUTPUT',
              '-p', 'tcp',
              '--sport', f'{port_lo}:{port_hi}',
              '-j', 'MARK', '--set-mark', str(mark)],
         )
-        subprocess.run(
-            ['tc', 'filter', 'del', 'dev', iface,
+        _run(
+            ['/sbin/tc', 'filter', 'del', 'dev', iface,
              'parent', '1:', 'handle', str(mark), 'fw'],
         )
         if self._class_exists(home_id):
-            subprocess.run(
-                ['tc', 'class', 'del', 'dev', iface, 'classid', classid],
+            _run(
+                ['/sbin/tc', 'class', 'del', 'dev', iface, 'classid', classid],
                 check=True,
             )
 

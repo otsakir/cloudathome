@@ -2,7 +2,7 @@ FROM python:3.12-alpine
 
 
 # install os system packages
-RUN apk add --no-cache openssh bash su-exec sudo && \
+RUN apk add --no-cache openssh bash su-exec sudo iproute2 iptables && \
     mkdir -p /var/run/sshd && \
     ssh-keygen -A
 

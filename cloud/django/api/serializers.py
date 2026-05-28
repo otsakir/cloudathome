@@ -21,6 +21,14 @@ class UpdateHomeKeySerializer(serializers.Serializer):
     public_key = serializers.CharField(max_length=800)
 
 
+class HomeBandwidthSerializer(serializers.Serializer):
+    bandwidth_limit_kbps = serializers.IntegerField(
+        min_value=100,
+        max_value=10_000_000,
+        allow_null=True,
+    )
+
+
 class OutHomeSerializer(serializers.ModelSerializer):
 
     ssh_username = serializers.SerializerMethodField()
@@ -38,4 +46,4 @@ class OutHomeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Home
-        fields = ['slug', 'ssh_username', 'port_base', 'port_count']
+        fields = ['slug', 'ssh_username', 'port_base', 'port_count', 'bandwidth_limit_kbps']
