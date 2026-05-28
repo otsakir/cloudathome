@@ -41,3 +41,13 @@ class CloudServerClient:
         )
         if resp.status_code != 204:
             raise CloudServerError(f'delete_proxy_mapping failed: {resp.status_code} {resp.text}')
+
+    def update_bandwidth(self, kbps_or_none):
+        resp = requests.patch(
+            self._url(f'/api/homes/{get_config().home_slug}/'),
+            headers=self._headers(),
+            json={'bandwidth_limit_kbps': kbps_or_none},
+        )
+        if resp.status_code != 200:
+            raise CloudServerError(f'update_bandwidth failed: {resp.status_code} {resp.text}')
+        return resp.json()
