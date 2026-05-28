@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from homes.services import ElevatedOperations
 from homes.services import HAProxyService
-from homes.tunnels.manage_tunnel import tunnel_manager
+from homes.tunnels.manage_home import tunnel_manager
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, OpenApiResponse

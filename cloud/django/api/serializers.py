@@ -1,7 +1,7 @@
 import sys
 from rest_framework import serializers
 from homes.models import Home
-from homes.tunnels.manage_tunnel import tunnel_manager
+from homes.tunnels.manage_home import tunnel_manager
 
 
 class HomeSerializer(serializers.Serializer):

@@ -90,8 +90,8 @@ class ElevatedOperations:
         with open(public_key_filepath, 'w') as f:
             f.write(public_key)
 
-        subprocess.run(['sudo', 'manage_tunnel.py', 'add', username, str(home_id), '-p', public_key_filename], check=True)
-        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'add', username, str(home_id), '-p', public_key_filename], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'reload'], check=True)
 
     @staticmethod
     def update_home_user_key(home_id: int, username: str, public_key: str):
@@ -101,13 +101,27 @@ class ElevatedOperations:
         with open(public_key_filepath, 'w') as f:
             f.write(public_key)
 
-        subprocess.run(['sudo', 'manage_tunnel.py', 'update-key', username, str(home_id), '-p', public_key_filename], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'update-key', username, str(home_id), '-p', public_key_filename], check=True)
 
     @staticmethod
     def remove_home_user(home_id: int, username: str):
-        subprocess.run(['sudo', 'manage_tunnel.py', 'remove', username, str(home_id)], check=True)
-        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'remove', username, str(home_id)], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'reload'], check=True)
 
     @staticmethod
     def reload_tunnel_users():
-        subprocess.run(['sudo', 'manage_tunnel.py', 'reload'], check=True)
+        subprocess.run(['sudo', 'manage_home.py', 'reload'], check=True)
+
+    @staticmethod
+    def set_home_bandwidth(home_id: int, rate_kbps: int):
+        subprocess.run(
+            ['sudo', 'manage_home.py', 'bandwidth', 'set', str(home_id), '--rate', str(rate_kbps)],
+            check=True,
+        )
+
+    @staticmethod
+    def unset_home_bandwidth(home_id: int):
+        subprocess.run(
+            ['sudo', 'manage_home.py', 'bandwidth', 'unset', str(home_id)],
+            check=True,
+        )
