@@ -4,7 +4,7 @@ import secrets
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView
 from rest_framework.views import APIView
 from homes.models import Home
-from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer
+from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
@@ -29,21 +29,36 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     @extend_schema(request=UpdateHomeKeySerializer, responses={200: OutHomeSerializer})
     def patch(self, request, *args, **kwargs):
         home = self.get_object()
-        s = UpdateHomeKeySerializer(data=request.data)
-        if not s.is_valid():
-            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            ElevatedOperations.update_home_user_key(
-                home.home_index,
-                home.user.username,
-                s.validated_data['public_key'],
-            )
-        except Exception:
-            return Response({'message': 'failed to update public key'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if 'public_key' in request.data:
+            s = UpdateHomeKeySerializer(data=request.data)
+            if not s.is_valid():
+                return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                ElevatedOperations.update_home_user_key(
+                    home.home_index,
+                    home.user.username,
+                    s.validated_data['public_key'],
+                )
+            except Exception:
+                return Response({'message': 'failed to update public key'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            home.public_key = s.validated_data['public_key']
+            home.save()
 
-        home.public_key = s.validated_data['public_key']
-        home.save()
+        if 'bandwidth_limit_kbps' in request.data:
+            s = HomeBandwidthSerializer(data=request.data)
+            if not s.is_valid():
+                return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+            new_limit = s.validated_data['bandwidth_limit_kbps']
+            try:
+                if new_limit:
+                    ElevatedOperations.set_home_bandwidth(home.home_index, new_limit)
+                else:
+                    ElevatedOperations.unset_home_bandwidth(home.home_index)
+            except Exception:
+                return Response({'message': 'failed to update bandwidth limit'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            home.bandwidth_limit_kbps = new_limit
+            home.save()
 
         return Response(OutHomeSerializer(home).data)
 

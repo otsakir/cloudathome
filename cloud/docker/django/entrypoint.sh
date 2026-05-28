@@ -13,6 +13,9 @@ chown -R django:django /opt/backend-var
 # recreate any system SSH users that are in the database but missing from the container
 su-exec django python /opt/app/manage.py reconcile_tunnel_users
 
+# re-apply bandwidth limits from the database (tc rules are lost on container restart)
+su-exec django python /opt/app/manage.py reconcile_bandwidth
+
 # run django
 su-exec django /opt/app/manage.py runserver 0.0.0.0:8000 &
 

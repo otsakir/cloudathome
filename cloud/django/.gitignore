@@ -1,5 +1,5 @@
 .venv
 var
-
+*.sqlite3
 
 
