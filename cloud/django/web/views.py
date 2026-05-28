@@ -11,7 +11,7 @@ from django.views.generic import FormView, TemplateView, View
 
 from homes.models import Home
 from homes.services import ElevatedOperations, HAProxyService
-from homes.tunnels.manage_tunnel import tunnel_manager
+from homes.tunnels.manage_home import tunnel_manager
 from web.forms import SignupForm, RegisterHomeForm, AddMappingForm
 
 

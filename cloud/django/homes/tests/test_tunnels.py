@@ -1,7 +1,7 @@
 import argparse
 
 from django.test import SimpleTestCase
-from homes.tunnels.manage_tunnel import Config, TunnelManager
+from homes.tunnels.manage_home import Config, TunnelManager, _build_parser
 import os
 import shutil
 from argparse import ArgumentParser
@@ -34,7 +34,7 @@ class TunnelManagerTest(SimpleTestCase):
 
 
         self.m = TunnelManager(config)
-        self.parser = self.m.get_parser(WrapErrorParser)
+        self.parser = _build_parser(self.m, WrapErrorParser)
 
     def test_add_to_allow_users(self):
         self.assertTrue(self.m.add_username_to_allow_users('nick'))

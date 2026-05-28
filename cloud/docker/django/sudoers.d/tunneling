@@ -1,1 +1,1 @@
-django ALL=(root) NOPASSWD: /usr/local/bin/manage_tunnel.py
+django ALL=(root) NOPASSWD: /usr/local/bin/manage_home.py

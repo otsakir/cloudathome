@@ -43,15 +43,19 @@ Use `DJANGO_SETTINGS_MODULE=cloudserver.settings.local_settings` for local dev (
 
 In local dev `HAPROXY_ENABLED=False` so HAProxy calls are skipped silently.
 
-### Tunnel management script (requires sudo)
+### Home management script (requires sudo)
 
 ```bash
-sudo python cloud/django/homes/tunnels/manage_tunnel.py add <suffix> <home_id> -p <pubkey_file>
-sudo python cloud/django/homes/tunnels/manage_tunnel.py remove <suffix> <home_id>
-sudo python cloud/django/homes/tunnels/manage_tunnel.py reload
+sudo python cloud/django/homes/tunnels/manage_home.py add <suffix> <home_id> -p <pubkey_file>
+sudo python cloud/django/homes/tunnels/manage_home.py remove <suffix> <home_id>
+sudo python cloud/django/homes/tunnels/manage_home.py update-key <suffix> <home_id> -p <pubkey_file>
+sudo python cloud/django/homes/tunnels/manage_home.py reload
+
+sudo python cloud/django/homes/tunnels/manage_home.py bandwidth set <home_id> --rate <kbps>
+sudo python cloud/django/homes/tunnels/manage_home.py bandwidth unset <home_id>
 ```
 
-`add` and `remove` do not reload sshd automatically; `reload` must be called separately (as `ElevatedOperations` in `services.py` does).
+`add` and `remove` do not reload sshd automatically; `reload` must be called separately (as `ElevatedOperations` in `services.py` does). `remove` also cleans up any bandwidth limit for the home.
 
 ## Architecture
 
@@ -65,19 +69,19 @@ sudo python cloud/django/homes/tunnels/manage_tunnel.py reload
 ### Request & tunnel flow
 
 1. A home network registers by `POST /api/homes/` with its SSH public key.
-2. Django calls `ElevatedOperations.add_home_user()` (in `homes/services.py`), which sudo-executes `manage_tunnel.py`.
-3. `manage_tunnel.py` creates a system user (`home<ID>_<username>`), installs the SSH key, and configures per-user `sshd` restrictions (TCP-forward only, no TTY/shell, allowed port range 2000–2099).
+2. Django calls `ElevatedOperations.add_home_user()` (in `homes/services.py`), which sudo-executes `manage_home.py`.
+3. `manage_home.py` creates a system user (`home<ID>_<username>`), installs the SSH key, and configures per-user `sshd` restrictions (TCP-forward only, no TTY/shell, allowed port range 2000–2099).
 4. The home network's gateway opens an SSH reverse tunnel on the assigned port.
 5. The home calls `POST /api/homes/<slug>/proxy-mappings/` with a hostname and scheme. The cloud allocates a free port from the home's range, updates the HAProxy map via the Runtime API, and returns the allocated port. No mapping state is persisted in the cloud database.
 6. HAProxy routes incoming HTTPS traffic by SNI hostname to the matching tunnel backend.
 
 ### Key design points
 
-- **Privilege separation**: Django runs as the unprivileged `django` user. Tunnel management requires root; it is invoked via a tightly scoped sudoers rule (`/etc/sudoers.d/tunneling`) that permits only the `manage_tunnel.py` script.
+- **Privilege separation**: Django runs as the unprivileged `django` user. Tunnel management requires root; it is invoked via a tightly scoped sudoers rule (`/etc/sudoers.d/tunneling`) that permits only the `manage_home.py` script.
 - **Port allocation**: Each home slot gets a block of 10 ports starting at `2000 + (home_index * 100)`.
 - **Max homes**: 10 (indices 0–9), enforced in the `Home` model.
 - **Username format**: `home<XX>_<django_username>` (e.g. `home00_alice`). The Django username is the SSH suffix.
-- **Public keys** are staged to `/var/tunnelagent/public_keys/` before being passed to `manage_tunnel.py`.
+- **Public keys** are staged to `/var/tunnelagent/public_keys/` before being passed to `manage_home.py`.
 - **HAProxy routing**: 100 tunnel backends are pre-created in `haproxy.cfg` (one per port, ports 2000–2009, 2100–2109, … 2900–2909). SNI hostname → backend name mappings are stored in `sni_backends.map` and updated at runtime via the HAProxy Runtime API on port 9999. The maps start empty on each container start; homes are responsible for re-registering their mappings after a restart.
 - **Home ownership**: `Home.user` is a FK to Django's `User` with `PROTECT` — a user cannot be deleted while they have assigned homes.
 
@@ -96,7 +100,7 @@ cloud/
 │   │       └── host_http_backends.map    # Runtime HTTP Host → backend map
 │   └── django/
 │       ├── entrypoint.sh                 # Starts sshd + Django
-│       └── sudoers.d/tunneling           # Sudo grant for manage_tunnel.py
+│       └── sudoers.d/tunneling           # Sudo grant for manage_home.py
 └── django/
     ├── requirements.txt
     ├── manage.py
@@ -111,7 +115,7 @@ cloud/
     │   │   └── reconcile_tunnel_users.py # Recreates missing system users on startup
     │   ├── tests/                        # Tests for tunnel management
     │   └── tunnels/
-    │       └── manage_tunnel.py          # Core tunnel user management script
+    │       └── manage_home.py          # Core tunnel user management script
     ├── api/                              # DRF REST API (thin layer over homes/)
     │   ├── views.py
     │   ├── serializers.py
