@@ -6,6 +6,7 @@ USER root
 # requirement that the map file exists at startup.
 RUN mkdir -p /usr/local/etc/haproxy/maps && \
     touch /usr/local/etc/haproxy/maps/sni_backends.map \
-          /usr/local/etc/haproxy/maps/host_http_backends.map && \
+          /usr/local/etc/haproxy/maps/host_http_backends.map \
+          /usr/local/etc/haproxy/maps/tcp_backends.map && \
     chown -R haproxy:haproxy /usr/local/etc/haproxy/maps
 USER haproxy

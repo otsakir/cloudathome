@@ -10,6 +10,7 @@ from cloudserver.settings import CAH_PUBLIC_KEY_STORAGE_PATH
 
 SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
 HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
+TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
 
 class HAProxyService:
@@ -31,33 +32,43 @@ class HAProxyService:
         return b''.join(chunks).decode()
 
     @classmethod
-    def add_mapping(cls, host, tunnel_port, scheme):
+    def add_mapping(cls, scheme, tunnel_port, host=None, public_port=None):
         if scheme == 'https':
-            map_file, backend = SNI_MAP_FILE, f'tunnel_{tunnel_port}'
-        else:
-            map_file, backend = HTTP_MAP_FILE, f'http_tunnel_{tunnel_port}'
-        cls._send_command(f'add map {map_file} {host} {backend}')
+            cls._send_command(f'add map {SNI_MAP_FILE} {host} tunnel_{tunnel_port}')
+        elif scheme == 'http':
+            cls._send_command(f'add map {HTTP_MAP_FILE} {host} http_tunnel_{tunnel_port}')
+        elif scheme == 'tcp':
+            cls._send_command(f'add map {TCP_MAP_FILE} {public_port} tunnel_{tunnel_port}')
 
     @classmethod
-    def remove_mapping(cls, host):
-        # Remove from both maps; HAProxy treats del map on a missing key as a no-op.
-        cls._send_command(f'del map {SNI_MAP_FILE} {host}')
-        cls._send_command(f'del map {HTTP_MAP_FILE} {host}')
+    def remove_mapping(cls, key):
+        # key is a hostname (http/https) or public port number (tcp).
+        # HAProxy treats del map on a missing key as a no-op, so we try all maps.
+        cls._send_command(f'del map {SNI_MAP_FILE} {key}')
+        cls._send_command(f'del map {HTTP_MAP_FILE} {key}')
+        cls._send_command(f'del map {TCP_MAP_FILE} {key}')
 
     @classmethod
     def dump_mappings(cls):
         entries = []
-        for map_file in (SNI_MAP_FILE, HTTP_MAP_FILE):
+        for map_file, scheme in (
+            (SNI_MAP_FILE, 'https'),
+            (HTTP_MAP_FILE, 'http'),
+            (TCP_MAP_FILE, 'tcp'),
+        ):
             output = cls._send_command(f'show map {map_file}')
             for line in output.splitlines():
                 parts = line.split()
                 if len(parts) == 3:
-                    entries.append({'host': parts[1], 'backend': parts[2]})
+                    if scheme == 'tcp':
+                        entries.append({'public_port': int(parts[1]), 'backend': parts[2], 'scheme': 'tcp'})
+                    else:
+                        entries.append({'host': parts[1], 'backend': parts[2], 'scheme': scheme})
         return entries
 
     @classmethod
     def get_used_ports(cls):
-        """Return the set of tunnel ports currently registered in HAProxy maps."""
+        """Return the set of tunnel ports currently registered across all HAProxy maps."""
         used = set()
         for entry in cls.dump_mappings():
             m = re.search(r'(\d+)$', entry['backend'])
@@ -66,17 +77,44 @@ class HAProxyService:
         return used
 
     @classmethod
-    def get_home_mappings(cls, port_base, port_count):
-        """Return entries for a home's port range as {host, tunnel_port, scheme} dicts."""
-        ports = set(range(port_base, port_base + port_count))
+    def get_used_tcp_public_ports(cls):
+        """Return the set of public TCP ports currently registered in the TCP map."""
+        used = set()
+        output = cls._send_command(f'show map {TCP_MAP_FILE}')
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) == 3:
+                try:
+                    used.add(int(parts[1]))
+                except ValueError:
+                    pass
+        return used
+
+    @classmethod
+    def get_home_mappings(cls, port_base, port_count, tcp_public_port_base=None, tcp_public_port_count=None):
+        """Return all active mappings for a home as dicts.
+
+        HTTP/HTTPS entries: {host, tunnel_port, scheme}
+        TCP entries:        {public_port, tunnel_port, scheme}
+        """
+        tunnel_ports = set(range(port_base, port_base + port_count))
+        tcp_public_ports = set()
+        if tcp_public_port_base is not None and tcp_public_port_count is not None:
+            tcp_public_ports = set(range(tcp_public_port_base, tcp_public_port_base + tcp_public_port_count))
+
         result = []
         for entry in cls.dump_mappings():
             m = re.search(r'(\d+)$', entry['backend'])
-            if m:
-                port = int(m.group(1))
-                if port in ports:
-                    scheme = 'http' if entry['backend'].startswith('http_tunnel_') else 'https'
-                    result.append({'host': entry['host'], 'tunnel_port': port, 'scheme': scheme})
+            if not m:
+                continue
+            tunnel_port = int(m.group(1))
+            scheme = entry['scheme']
+            if scheme == 'tcp':
+                pub_port = entry.get('public_port')
+                if pub_port in tcp_public_ports:
+                    result.append({'public_port': pub_port, 'tunnel_port': tunnel_port, 'scheme': 'tcp'})
+            elif tunnel_port in tunnel_ports:
+                result.append({'host': entry['host'], 'tunnel_port': tunnel_port, 'scheme': scheme})
         return result
 
 
