@@ -14,31 +14,31 @@ A system that allows running application servers at home and making them reachab
 
 | Component | Location | Role |
 |-----------|----------|------|
-| **HAProxy** | Cloud server | SNI-based HTTPS ingress on port 443. Routes traffic to per-home SSH tunnel ports via a runtime-updated map file. |
+| **HAProxy** | Cloud server | HTTPS ingress on port 443 (SNI-based routing) and TCP forwarding on ports 10000–10099 (port-based routing). Routes traffic to per-home SSH tunnel ports via runtime-updated map files. |
 | **Django + sshd** | Cloud server | REST API and web UI for managing homes and proxy mappings. SSH server that accepts reverse tunnels from home networks. |
-| **Home Console** | Home network | Django app that manages domains, TLS certificates, and SSH reverse tunnels. Reads connection config from a local YAML file. |
+| **Home Console** | Home network | Django app that manages HTTP/HTTPS forwards (domain + TLS certificate lifecycle), TCP forwards, and SSH reverse tunnels. Reads connection config from a local YAML file. |
 | **Setup scripts** | Home network | Standalone scripts that generate an SSH key pair and register the home with the cloud server. Run once before starting the Home Console. |
 
 ### How it works
 
 1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config.yaml`.
 2. The Home Console Django app is started. It reads `config.yaml` and is ready for use.
-3. The operator adds a domain and a proxy entry in the Home Console. This registers the mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally.
-4. The operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
+3. The operator adds forwards in the Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally.
+4. For HTTP/HTTPS forwards: the operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
 5. The operator closes the temporary tunnel if needed, or keeps it open for production traffic.
-6. Incoming HTTPS traffic hits HAProxy on port 443, which routes it by SNI hostname through the tunnel to the home service.
+6. Incoming HTTPS traffic hits HAProxy on port 443, routed by SNI hostname through the tunnel. Incoming TCP traffic hits HAProxy on the allocated public port (10000–10099), routed by destination port through the tunnel.
 
 
 ## Cloud server
 
-### Running with Docker
+### Running (Docker only)
 
 ```bash
 docker compose -f cloud/compose.yaml up --build
 ```
 
 This starts two containers:
-- **haproxy** — listens on ports 80 and 443
+- **haproxy** — listens on ports 80 and 443 (HTTP/HTTPS) and 10000–10099 (TCP forwards)
 - **tunnelagent** — Django API on port 8000, SSH server on port 8022
 
 HAProxy must pass its health check before `tunnelagent` starts.
@@ -191,7 +191,7 @@ Certificate issuance is tied to a proxy entry. The full sequence from the Home C
 
 **3. Open the tunnel** — on the proxy entry detail page click **Open tunnel**. This starts an SSH reverse tunnel: `cloud_tunnel_port → home:home_port`.
 
-**4. Issue the certificate** — with the tunnel open, enter your email and click **Issue certificate**. Certbot runs in standalone mode, Let's Encrypt validates the HTTP-01 challenge through the tunnel, and the certificate is saved to `home/certbot/config/live/<domain>/`.
+**4. Issue the certificate** — with the tunnel open, click **Issue certificate**. Enter your email on the certificate page and submit. Certbot runs in standalone mode, Let's Encrypt validates the HTTP-01 challenge through the tunnel, and the certificate is saved to `home/certbot/config/live/<domain>/`.
 
 The domain record is updated with the certificate path and expiry date on success.
 
@@ -240,8 +240,8 @@ SSH process output (stdout/stderr) is inherited from the Django process and appe
 - **Open tunnel / Close tunnel** — manually open or close a single tunnel.
 - **Sync** — idempotent reconnect: re-registers the cloud proxy mapping and reopens the tunnel if it is not running. Use this to recover a single entry after a crash or restart.
 
-**Global controls** (domain list page):
-- **Sync all** — syncs every proxy entry at once. The intended way to restore all tunnels after the Home Console restarts.
+**Global controls** (dashboard):
+- **Connect all** — syncs every proxy entry at once. The intended way to restore all tunnels after the Home Console restarts.
 - **Disconnect all** — closes all tunnels and removes all cloud proxy mappings cleanly.
 
 **Management command** — the same sync operations are available from the command line:
@@ -314,7 +314,7 @@ From the proxy entry detail page click **Open tunnel**, then enter your email an
 
 ### 8. Open the tunnel for production traffic
 
-Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Sync all** on the domain list to restore all tunnels at once. After any future Home Console restart, **Sync all** is the quickest way to bring everything back up.
+Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future Home Console restart, **Connect all** is the quickest way to bring everything back up.
 
 ### 9. Test
 
