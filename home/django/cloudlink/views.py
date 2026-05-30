@@ -4,7 +4,8 @@ from django.views.generic import TemplateView, FormView
 
 from cloudlink.config import get_config
 from cloudlink.services import CloudServerClient, CloudServerError
-from domains.models import Domain
+from domains.models import Domain, ProxyEntry
+from domains.services import TunnelService
 
 
 class DashboardView(TemplateView):
@@ -12,8 +13,32 @@ class DashboardView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['config'] = get_config()
-        context['domains'] = Domain.objects.all()
+        cfg = get_config()
+        context['config'] = cfg
+        context['port_max'] = cfg.port_base + cfg.port_count - 1
+        if cfg.tcp_port_base is not None and cfg.tcp_port_count is not None:
+            context['tcp_port_max'] = cfg.tcp_port_base + cfg.tcp_port_count - 1
+
+        domains = list(Domain.objects.select_related('proxy_entry').all())
+        for domain in domains:
+            try:
+                entry = domain.proxy_entry
+                entry.listening = (
+                    TunnelService.is_home_port_open(entry.home_host, entry.home_port)
+                    if entry.tunnel_status == ProxyEntry.TUNNEL_OPEN else None
+                )
+            except Exception:
+                pass
+        context['domains'] = domains
+
+        tcp_entries = list(ProxyEntry.objects.filter(scheme=ProxyEntry.SCHEME_TCP))
+        for entry in tcp_entries:
+            entry.listening = (
+                TunnelService.is_home_port_open(entry.home_host, entry.home_port)
+                if entry.tunnel_status == ProxyEntry.TUNNEL_OPEN else None
+            )
+        context['tcp_entries'] = tcp_entries
+
         try:
             home = CloudServerClient().get_home()
             context['bandwidth_limit_kbps'] = home.get('bandwidth_limit_kbps')

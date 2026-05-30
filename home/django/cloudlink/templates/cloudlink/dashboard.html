@@ -4,13 +4,31 @@
 <body>
 <h1>CloudAtHome Console</h1>
 
+{% if messages %}
+  <ul>
+    {% for message in messages %}<li><strong>{{ message }}</strong></li>{% endfor %}
+  </ul>
+{% endif %}
+
+<form method="post" action="{% url 'sync_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Connect all</button>
+</form>
+<form method="post" action="{% url 'disconnect_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Disconnect all</button>
+</form>
+
 <h2>Cloud connection</h2>
 <table>
   <tr><th>CloudServer URL</th><td>{{ config.cloudserver_url }}</td></tr>
   <tr><th>Home slug</th><td>{{ config.home_slug }}</td></tr>
   <tr><th>SSH username</th><td>{{ config.ssh.username }}</td></tr>
   <tr><th>SSH host</th><td>{{ config.ssh.host }}:{{ config.ssh.port }}</td></tr>
-  <tr><th>Port range</th><td>{{ config.port_base }} – {{ config.port_base|add:config.port_count|add:"-1" }}</td></tr>
+  <tr><th>Port range</th><td>{{ config.port_base }} – {{ port_max }}</td></tr>
+  {% if config.tcp_port_base %}
+  <tr><th>TCP public ports</th><td>{{ config.tcp_port_base }} – {{ tcp_port_max }}</td></tr>
+  {% endif %}
   <tr>
     <th>Bandwidth limit</th>
     <td>
@@ -20,23 +38,46 @@
   </tr>
 </table>
 
-<h2>Domains</h2>
+<h2>HTTP/HTTPS forwards</h2>
 <p><a href="{% url 'domain_list' %}">Manage domains</a></p>
 {% if domains %}
   <table>
-    <thead><tr><th>Name</th><th>Cert status</th><th>Expiry</th></tr></thead>
+    <thead><tr><th>Name</th><th>Cert status</th><th>Expiry</th><th>Tunnel</th><th>Listening</th></tr></thead>
     <tbody>
       {% for domain in domains %}
         <tr>
           <td><a href="{% url 'domain_detail' domain.pk %}">{{ domain.name }}</a></td>
           <td>{{ domain.cert_status }}</td>
           <td>{{ domain.cert_expiry|default:"—" }}</td>
+          <td>{% if domain.proxy_entry %}{{ domain.proxy_entry.tunnel_status }}{% else %}—{% endif %}</td>
+          <td>{% if domain.proxy_entry and domain.proxy_entry.tunnel_status == 'open' %}{{ domain.proxy_entry.listening|yesno:"listening,not listening,—" }}{% endif %}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 {% else %}
   <p>No domains yet. <a href="{% url 'add_domain' %}">Add one.</a></p>
+{% endif %}
+
+<h2>TCP forwards</h2>
+<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
+{% if tcp_entries %}
+  <table>
+    <thead><tr><th>Public port</th><th>Home</th><th>Tunnel port</th><th>Status</th><th>Listening</th></tr></thead>
+    <tbody>
+      {% for entry in tcp_entries %}
+        <tr>
+          <td><a href="{% url 'proxy_entry_detail' entry.pk %}">{{ entry.public_port }}</a></td>
+          <td>{{ entry.home_host }}:{{ entry.home_port }}</td>
+          <td>{{ entry.tunnel_port }}</td>
+          <td>{{ entry.tunnel_status }}</td>
+          <td>{% if entry.tunnel_status == 'open' %}{{ entry.listening|yesno:"listening,not listening,—" }}{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No TCP forwards yet.</p>
 {% endif %}
 </body>
 </html>

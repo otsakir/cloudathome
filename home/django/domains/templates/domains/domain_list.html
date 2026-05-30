@@ -2,7 +2,7 @@
 <html>
 <head><title>Domains</title></head>
 <body>
-<h1>Domains</h1>
+<h1>HTTP/HTTPS forwards</h1>
 <p><a href="{% url 'add_domain' %}">Add domain</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
 
 {% if messages %}
@@ -11,19 +11,10 @@
   </ul>
 {% endif %}
 
-<form method="post" action="{% url 'sync_all' %}" style="display:inline">
-  {% csrf_token %}
-  <button type="submit">Sync all</button>
-</form>
-<form method="post" action="{% url 'disconnect_all' %}" style="display:inline">
-  {% csrf_token %}
-  <button type="submit">Disconnect all</button>
-</form>
-
 {% if domains %}
   <table>
     <thead>
-      <tr><th>Name</th><th>Cert status</th><th>Expiry</th><th></th></tr>
+      <tr><th>Name</th><th>Cert status</th><th>Expiry</th><th>Tunnel</th><th></th></tr>
     </thead>
     <tbody>
       {% for domain in domains %}
@@ -31,6 +22,7 @@
           <td><a href="{% url 'domain_detail' domain.pk %}">{{ domain.name }}</a></td>
           <td>{{ domain.cert_status }}</td>
           <td>{{ domain.cert_expiry|default:"—" }}</td>
+          <td>{% if domain.proxy_entry %}{{ domain.proxy_entry.tunnel_status }}{% else %}—{% endif %}</td>
           <td><a href="{% url 'delete_domain' domain.pk %}">Delete</a></td>
         </tr>
       {% endfor %}
@@ -40,32 +32,5 @@
   <p>No domains yet.</p>
 {% endif %}
 
-<h2>TCP forwards</h2>
-<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
-{% if tcp_entries %}
-  <table>
-    <thead>
-      <tr><th>Public port</th><th>Home</th><th>Tunnel port</th><th>Status</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for entry in tcp_entries %}
-        <tr>
-          <td><a href="{% url 'proxy_entry_detail' entry.pk %}">{{ entry.public_port }}</a></td>
-          <td>{{ entry.home_host }}:{{ entry.home_port }}</td>
-          <td>{{ entry.tunnel_port }}</td>
-          <td>{{ entry.tunnel_status }}</td>
-          <td>
-            <form method="post" action="{% url 'delete_proxy_entry' entry.pk %}" style="display:inline">
-              {% csrf_token %}
-              <button type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>No TCP forwards yet.</p>
-{% endif %}
 </body>
 </html>
