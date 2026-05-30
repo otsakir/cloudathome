@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html>
-<head><title>Proxy entry — {{ object.cloudserver_host }}</title></head>
+<head><title>Proxy entry — {{ object }}</title></head>
 <body>
-<h1>{{ object.cloudserver_host }}</h1>
+<h1>{{ object }}</h1>
 <p>
-  <a href="{% url 'domain_detail' object.domain_id %}">Back to {{ object.domain }}</a>
+  {% if object.domain %}
+    <a href="{% url 'domain_detail' object.domain_id %}">Back to {{ object.domain }}</a>
+  {% else %}
+    <a href="{% url 'domain_list' %}">Back to list</a>
+  {% endif %}
 </p>
 
 {% if messages %}
@@ -15,8 +19,12 @@
 
 <h2>Details</h2>
 <table>
-  <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
   <tr><th>Scheme</th><td>{{ object.scheme|upper }}</td></tr>
+  {% if object.scheme == 'tcp' %}
+    <tr><th>Public port</th><td>{{ object.public_port }}</td></tr>
+  {% else %}
+    <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
+  {% endif %}
   <tr><th>Tunnel port</th><td>{{ object.tunnel_port }}</td></tr>
   <tr><th>Home network host</th><td>{{ object.home_host }}</td></tr>
   <tr>
@@ -46,25 +54,28 @@
   {% csrf_token %}
   <button type="submit">Sync</button>
 </form>
+<form method="post" action="{% url 'delete_proxy_entry' object.pk %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Delete</button>
+</form>
 
+{% if object.scheme != 'tcp' %}
 <h2>Certificate</h2>
-{% with cert=object.domain.cert_status %}
   <table>
     <tr><th>Status</th><td>{{ object.domain.cert_status }}</td></tr>
     <tr><th>Expiry</th><td>{{ object.domain.cert_expiry|default:"—" }}</td></tr>
     <tr><th>Path</th><td>{{ object.domain.cert_path|default:"—" }}</td></tr>
   </table>
-{% endwith %}
-
-{% if object.tunnel_status == 'open' %}
-  <form method="post" action="{% url 'issue_certificate' object.pk %}">
-    {% csrf_token %}
-    <label for="id_email">Email address</label>
-    <input type="email" name="email" id="id_email" required>
-    <button type="submit">Issue certificate</button>
-  </form>
-{% else %}
-  <p>Open the tunnel before issuing a certificate.</p>
+  {% if object.tunnel_status == 'open' %}
+    <form method="post" action="{% url 'issue_certificate' object.pk %}">
+      {% csrf_token %}
+      <label for="id_email">Email address</label>
+      <input type="email" name="email" id="id_email" required>
+      <button type="submit">Issue certificate</button>
+    </form>
+  {% else %}
+    <p>Open the tunnel before issuing a certificate.</p>
+  {% endif %}
 {% endif %}
 
 </body>

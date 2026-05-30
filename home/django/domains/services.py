@@ -149,12 +149,18 @@ class SyncService:
 
         # Remove any stale cloud mapping before re-creating it.
         try:
-            client.delete_proxy_mapping(entry.cloudserver_host)
+            if entry.scheme == ProxyEntry.SCHEME_TCP:
+                client.delete_proxy_mapping(str(entry.public_port))
+            else:
+                client.delete_proxy_mapping(entry.cloudserver_host)
         except Exception:
             pass
 
         try:
-            result = client.create_proxy_mapping(entry.cloudserver_host, entry.scheme)
+            if entry.scheme == ProxyEntry.SCHEME_TCP:
+                result = client.create_proxy_mapping('tcp', public_port=entry.public_port)
+            else:
+                result = client.create_proxy_mapping(entry.scheme, host=entry.cloudserver_host)
             entry.tunnel_port = result['tunnel_port']
         except CloudServerError:
             entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
@@ -196,7 +202,10 @@ class SyncService:
             TunnelService.close_tunnel(entry.tunnel_pid)
         client = CloudServerClient()
         try:
-            client.delete_proxy_mapping(entry.cloudserver_host)
+            if entry.scheme == ProxyEntry.SCHEME_TCP:
+                client.delete_proxy_mapping(str(entry.public_port))
+            else:
+                client.delete_proxy_mapping(entry.cloudserver_host)
         except Exception:
             pass
         entry.tunnel_pid = None

@@ -31,7 +31,8 @@ class ProxyEntry(models.Model):
     """
     SCHEME_HTTP = 'http'
     SCHEME_HTTPS = 'https'
-    SCHEME_CHOICES = [(SCHEME_HTTP, 'HTTP'), (SCHEME_HTTPS, 'HTTPS')]
+    SCHEME_TCP = 'tcp'
+    SCHEME_CHOICES = [(SCHEME_HTTP, 'HTTP'), (SCHEME_HTTPS, 'HTTPS'), (SCHEME_TCP, 'TCP')]
 
     TUNNEL_CLOSED = 'closed'
     TUNNEL_OPEN = 'open'
@@ -42,9 +43,10 @@ class ProxyEntry(models.Model):
         (TUNNEL_ERROR, 'Error'),
     ]
 
-    domain = models.OneToOneField(Domain, on_delete=models.CASCADE, related_name='proxy_entry')
-    cloudserver_host = models.CharField(max_length=253, unique=True)
+    domain = models.OneToOneField(Domain, null=True, blank=True, on_delete=models.CASCADE, related_name='proxy_entry')
+    cloudserver_host = models.CharField(max_length=253, unique=True, null=True, blank=True)
     tunnel_port = models.IntegerField()
+    public_port = models.IntegerField(null=True, blank=True)
     home_host = models.CharField(max_length=253, default='localhost')
     home_port = models.IntegerField()
     scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
@@ -57,4 +59,6 @@ class ProxyEntry(models.Model):
         ]
 
     def __str__(self):
+        if self.scheme == self.SCHEME_TCP:
+            return f'TCP :{self.public_port} → {self.home_host}:{self.home_port}'
         return f'{self.cloudserver_host} → {self.home_host}:{self.home_port} ({self.scheme})'
