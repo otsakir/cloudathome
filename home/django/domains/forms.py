@@ -29,6 +29,24 @@ class ProxyEntryForm(forms.Form):
     )
 
 
+class TcpProxyEntryForm(forms.Form):
+    public_port = forms.IntegerField(
+        label='Public port',
+        help_text='Port on the cloud server clients will connect to (must be within your allocated TCP range).',
+    )
+    home_host = forms.CharField(
+        max_length=253,
+        initial='localhost',
+        required=False,
+        label='Home network host',
+        help_text='Hostname or IP of the target service on the home network.',
+    )
+    home_port = forms.IntegerField(
+        label='Home port',
+        help_text='Port of the local service to expose.',
+    )
+
+
 class IssueCertificateForm(forms.Form):
     email = forms.EmailField(
         label='Email address',

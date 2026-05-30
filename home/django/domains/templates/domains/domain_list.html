@@ -39,5 +39,33 @@
 {% else %}
   <p>No domains yet.</p>
 {% endif %}
+
+<h2>TCP forwards</h2>
+<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
+{% if tcp_entries %}
+  <table>
+    <thead>
+      <tr><th>Public port</th><th>Home</th><th>Tunnel port</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for entry in tcp_entries %}
+        <tr>
+          <td><a href="{% url 'proxy_entry_detail' entry.pk %}">{{ entry.public_port }}</a></td>
+          <td>{{ entry.home_host }}:{{ entry.home_port }}</td>
+          <td>{{ entry.tunnel_port }}</td>
+          <td>{{ entry.tunnel_status }}</td>
+          <td>
+            <form method="post" action="{% url 'delete_proxy_entry' entry.pk %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No TCP forwards yet.</p>
+{% endif %}
 </body>
 </html>

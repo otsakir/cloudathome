@@ -29,6 +29,12 @@ cloudlink:
     # Number of tunnel ports available (one per proxy entry)
     count: 10
 
+  tcp_ports:
+    # First public TCP port allocated to this home on the cloud server
+    base: 10300
+    # Number of public TCP ports available (one per TCP forward)
+    count: 10
+
 # Path to the SQLite database file.
 # Relative paths are resolved against this config file's directory.
 # Default when omitted: db.sqlite3 (alongside config.yaml)

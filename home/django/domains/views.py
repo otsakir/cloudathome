@@ -4,7 +4,7 @@ from django.views import View
 from django.views.generic import ListView, DetailView, FormView
 
 from cloudlink.services import CloudServerClient, CloudServerError
-from domains.forms import AddDomainForm, IssueCertificateForm, ProxyEntryForm
+from domains.forms import AddDomainForm, IssueCertificateForm, ProxyEntryForm, TcpProxyEntryForm
 from domains.models import Domain, ProxyEntry
 from domains.services import CertbotError, CertbotService, SyncService, TunnelService
 
@@ -15,7 +15,8 @@ def _delete_proxy_entry(entry):
         TunnelService.close_tunnel(entry.tunnel_pid)
     client = CloudServerClient()
     try:
-        client.delete_proxy_mapping(entry.cloudserver_host)
+        key = str(entry.public_port) if entry.scheme == ProxyEntry.SCHEME_TCP else entry.cloudserver_host
+        client.delete_proxy_mapping(key)
     except Exception:
         pass
     entry.delete()
@@ -25,6 +26,11 @@ class DomainListView(ListView):
     model = Domain
     template_name = 'domains/domain_list.html'
     context_object_name = 'domains'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['tcp_entries'] = ProxyEntry.objects.filter(scheme=ProxyEntry.SCHEME_TCP)
+        return context
 
 
 class AddDomainView(FormView):
@@ -149,12 +155,68 @@ class IssueCertificateView(FormView):
         return redirect('proxy_entry_detail', pk=self.entry.pk)
 
 
+class TcpProxyEntryCreateView(FormView):
+    template_name = 'domains/add_tcp_proxy_entry.html'
+    form_class = TcpProxyEntryForm
+
+    def get_context_data(self, **kwargs):
+        from cloudlink.config import get_config
+        context = super().get_context_data(**kwargs)
+        cfg = get_config()
+        context['tcp_port_base'] = cfg.tcp_port_base
+        context['tcp_port_count'] = cfg.tcp_port_count
+        if cfg.tcp_port_base is not None and cfg.tcp_port_count is not None:
+            context['tcp_port_max'] = cfg.tcp_port_base + cfg.tcp_port_count - 1
+        context['lan_forwarding'] = cfg.features.lan_forwarding
+        return context
+
+    def form_valid(self, form):
+        from cloudlink.config import get_config
+        cfg = get_config()
+        public_port = form.cleaned_data['public_port']
+        home_port = form.cleaned_data['home_port']
+        home_host = form.cleaned_data.get('home_host') or 'localhost'
+        if not cfg.features.lan_forwarding:
+            home_host = 'localhost'
+
+        if cfg.tcp_port_base is not None and cfg.tcp_port_count is not None:
+            if not (cfg.tcp_port_base <= public_port < cfg.tcp_port_base + cfg.tcp_port_count):
+                form.add_error('public_port', f'Must be in range {cfg.tcp_port_base}–{cfg.tcp_port_base + cfg.tcp_port_count - 1}.')
+                return self.form_invalid(form)
+
+        if ProxyEntry.objects.filter(public_port=public_port).exists():
+            form.add_error('public_port', 'This public port is already registered.')
+            return self.form_invalid(form)
+
+        if ProxyEntry.objects.filter(home_host=home_host, home_port=home_port).exists():
+            form.add_error(None, f'{home_host}:{home_port} is already used by another proxy entry.')
+            return self.form_invalid(form)
+
+        client = CloudServerClient()
+        try:
+            result = client.create_proxy_mapping('tcp', public_port=public_port)
+        except CloudServerError as e:
+            form.add_error(None, str(e))
+            return self.form_invalid(form)
+
+        entry = ProxyEntry.objects.create(
+            scheme=ProxyEntry.SCHEME_TCP,
+            public_port=public_port,
+            tunnel_port=result['tunnel_port'],
+            home_host=home_host,
+            home_port=home_port,
+        )
+        return redirect('proxy_entry_detail', pk=entry.pk)
+
+
 class DeleteProxyEntryView(View):
     def post(self, request, pk):
         entry = get_object_or_404(ProxyEntry, pk=pk)
         domain_pk = entry.domain_id
         _delete_proxy_entry(entry)
-        return redirect('domain_detail', pk=domain_pk)
+        if domain_pk:
+            return redirect('domain_detail', pk=domain_pk)
+        return redirect('domain_list')
 
 
 class SyncAllView(View):

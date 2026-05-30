@@ -33,6 +33,8 @@ class CloudConfig:
     ssh: SSHConfig
     port_base: int
     port_count: int
+    tcp_port_base: int | None = None
+    tcp_port_count: int | None = None
     # Directory containing the config file; used to resolve relative paths.
     config_dir: Path = field(default_factory=Path.cwd)
     # Absolute path to the SQLite database file, resolved at load time.
@@ -71,6 +73,7 @@ def load_config(path=None) -> CloudConfig:
             lan_forwarding=bool(features_data.get('lan_forwarding', False)),
         )
 
+        tcp_ports = cl.get('tcp_ports') or {}
         return CloudConfig(
             cloudserver_url=cl['cloudserver_url'],
             auth_token=cl['auth_token'],
@@ -78,6 +81,8 @@ def load_config(path=None) -> CloudConfig:
             ssh=SSHConfig(**cl['ssh']),
             port_base=cl['ports']['base'],
             port_count=cl['ports']['count'],
+            tcp_port_base=tcp_ports.get('base'),
+            tcp_port_count=tcp_ports.get('count'),
             config_dir=config_dir,
             database=db_path,
             certbot=CertbotConfig(deploy_path=certbot_deploy),

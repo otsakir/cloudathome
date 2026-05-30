@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><title>Add TCP forward</title></head>
+<body>
+<h1>Add TCP forward</h1>
+<p><a href="{% url 'domain_list' %}">Back to list</a></p>
+
+<p>Exposes a local TCP service on a dedicated public port. The SSH tunnel is opened automatically.</p>
+
+{% if tcp_port_base and tcp_port_max %}
+  <p>Your allocated public port range: <strong>{{ tcp_port_base }}–{{ tcp_port_max }}</strong></p>
+{% endif %}
+
+{% if form.non_field_errors %}
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.public_port.label_tag }}<br>{{ form.public_port }}
+  {% if form.public_port.errors %}<ul>{% for e in form.public_port.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  <small>{{ form.public_port.help_text }}</small><br><br>
+
+  {% if lan_forwarding %}
+    {{ form.home_host.label_tag }}<br>{{ form.home_host }}
+    {% if form.home_host.errors %}<ul>{% for e in form.home_host.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    <small>{{ form.home_host.help_text }}</small><br><br>
+  {% endif %}
+
+  {{ form.home_port.label_tag }}<br>{{ form.home_port }}
+  {% if form.home_port.errors %}<ul>{% for e in form.home_port.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  <small>{{ form.home_port.help_text }}</small><br><br>
+
+  <button type="submit">Create</button>
+</form>
+</body>
+</html>
