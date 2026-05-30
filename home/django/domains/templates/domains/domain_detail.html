@@ -5,6 +5,7 @@
 <h1>{{ object.name }}</h1>
 <p>
   <a href="{% url 'domain_list' %}">Back to domains</a> |
+  <a href="{% url 'dashboard' %}">Dashboard</a> |
   <a href="{% url 'delete_domain' object.pk %}">Delete domain</a>
 </p>
 
@@ -25,7 +26,7 @@
   </p>
   <form method="post" action="{% url 'delete_proxy_entry' entry.pk %}">
     {% csrf_token %}
-    <button type="submit">Delete proxy entry</button>
+    <button type="submit" onclick="return confirm('Close the tunnel and delete this proxy entry?')">Delete proxy entry</button>
   </form>
   {% endwith %}
 {% else %}

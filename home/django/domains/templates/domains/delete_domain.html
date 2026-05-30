@@ -9,7 +9,8 @@ and its proxy entries. The certificate files on disk will not be removed.</p>
 <form method="post">
   {% csrf_token %}
   <button type="submit">Confirm delete</button>
-  <a href="{% url 'domain_detail' domain.pk %}">Cancel</a>
+  <a href="{% url 'domain_detail' domain.pk %}">Cancel</a> |
+  <a href="{% url 'dashboard' %}">Dashboard</a>
 </form>
 </body>
 </html>

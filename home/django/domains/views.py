@@ -27,10 +27,11 @@ class DomainListView(ListView):
     template_name = 'domains/domain_list.html'
     context_object_name = 'domains'
 
+    def get_queryset(self):
+        return Domain.objects.select_related('proxy_entry').all()
+
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['tcp_entries'] = ProxyEntry.objects.filter(scheme=ProxyEntry.SCHEME_TCP)
-        return context
+        return super().get_context_data(**kwargs)
 
 
 class AddDomainView(FormView):
@@ -223,17 +224,17 @@ class SyncAllView(View):
     def post(self, request):
         succeeded, failed = SyncService.sync_all()
         if failed:
-            messages.warning(request, f'Sync complete: {succeeded} succeeded, {failed} failed')
+            messages.warning(request, f'Connect all: {succeeded} connected, {failed} failed')
         else:
-            messages.success(request, f'Sync complete: {succeeded} entries synced')
-        return redirect('domain_list')
+            messages.success(request, f'All tunnels connected ({succeeded} entries)')
+        return redirect('dashboard')
 
 
 class DisconnectAllView(View):
     def post(self, request):
         SyncService.disconnect_all()
         messages.success(request, 'All tunnels disconnected')
-        return redirect('domain_list')
+        return redirect('dashboard')
 
 
 class SyncEntryView(View):

@@ -3,7 +3,7 @@
 <head><title>Add domain</title></head>
 <body>
 <h1>Add domain</h1>
-<p><a href="{% url 'domain_list' %}">Back to domains</a></p>
+<p><a href="{% url 'domain_list' %}">Back to domains</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
 
 {% if form.non_field_errors %}
   <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
