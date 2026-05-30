@@ -31,6 +31,9 @@ class Config:
     HOME_PORTS_BASE = 2000
     PORTS_PER_HOME_RESERVED = 100
 
+    TCP_PUBLIC_PORTS_BASE = 10000
+    TCP_PUBLIC_PORTS_PER_HOME = 100
+
     BANDWIDTH_MIN_KBPS = 100
     BANDWIDTH_MAX_KBPS = 10_000_000
 
@@ -133,6 +136,9 @@ class TunnelManager:
 
     def get_home_port_base(self, home_id: int):
         return self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
+
+    def get_home_tcp_public_port_base(self, home_id: int):
+        return self.config.TCP_PUBLIC_PORTS_BASE + home_id * self.config.TCP_PUBLIC_PORTS_PER_HOME
 
     def create_tunnel_user(self, username: str, public_key_filename: str):
         result = _run(['adduser', '-D', username])
