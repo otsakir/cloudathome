@@ -23,10 +23,11 @@ A system that allows running application servers at home and making them reachab
 
 1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config.yaml`.
 2. The Home Console Django app is started. It reads `config.yaml` and is ready for use.
-3. The operator adds forwards in the Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally.
-4. For HTTP/HTTPS forwards: the operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
-5. The operator closes the temporary tunnel if needed, or keeps it open for production traffic.
-6. Incoming HTTPS traffic hits HAProxy on port 443, routed by SNI hostname through the tunnel. Incoming TCP traffic hits HAProxy on the allocated public port (10000–10099), routed by destination port through the tunnel.
+3. For HTTP/HTTPS forwards, the operator first registers one or more **base domains** with the cloud server (e.g. `mysite.example.com`). The cloud enforces that no two homes can claim overlapping domains. The home is then authoritative for that domain and all its subdomains.
+4. The operator adds forwards in the Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally. HTTP/HTTPS forwards are only accepted if the hostname falls under one of the home's registered base domains.
+5. For HTTP/HTTPS forwards: the operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
+6. The operator closes the temporary tunnel if needed, or keeps it open for production traffic.
+7. Incoming HTTPS traffic hits HAProxy on port 443, routed by SNI hostname through the tunnel. Incoming TCP traffic hits HAProxy on the allocated public port (10000–10099), routed by destination port through the tunnel.
 
 
 ## Cloud server
@@ -67,6 +68,22 @@ The API is browsable via Swagger UI when running in debug mode:
 - Swagger UI: `http://localhost:8000/api/schema/swagger/`
 - ReDoc: `http://localhost:8000/api/schema/redoc/`
 - OpenAPI schema: `http://localhost:8000/api/schema/`
+
+#### Home endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/homes/` | List caller's assigned homes |
+| POST | `/api/homes/` | Claim a home slot and install SSH key |
+| GET | `/api/homes/<slug>/` | Retrieve home details (port ranges, base domains, bandwidth limit) |
+| PATCH | `/api/homes/<slug>/` | Update SSH public key or bandwidth limit |
+| DELETE | `/api/homes/<slug>/` | Release a home slot |
+| GET | `/api/homes/<slug>/base-domains/` | List registered base domains |
+| POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
+| DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (blocked if active proxy mappings exist under it) |
+| GET | `/api/homes/<slug>/proxy-mappings/` | List active HAProxy mappings for this home |
+| POST | `/api/homes/<slug>/proxy-mappings/` | Allocate a tunnel port and register in HAProxy |
+| DELETE | `/api/homes/<slug>/proxy-mappings/<key>/` | Remove a forwarding rule from HAProxy |
 
 #### Admin-only endpoints
 
@@ -180,6 +197,19 @@ python manage.py runserver 0.0.0.0:8001
 # dev cloud
 HOME_CONFIG=home/config-dev.yaml python manage.py runserver 0.0.0.0:8001
 ```
+
+### Base domains
+
+Before creating any HTTP/HTTPS proxy entry, the home must register at least one base domain with the cloud server. A base domain is a domain the operator controls in DNS — the cloud server enforces that no two homes can claim the same domain or overlapping domains (e.g. if Home A owns `example.com`, Home B cannot register `sub.example.com`).
+
+The cloud validates that the domain is a proper registrable domain (not a bare TLD like `com` or a public suffix like `co.uk`) using the Public Suffix List.
+
+**From the Home Console dashboard:**
+- Click **Register base domain**, enter the domain name, and submit.
+- The domain is stored on the cloud server and returned in the home's info response.
+- To remove a domain, click **Remove** next to it on the dashboard. This is blocked with an error if any active proxy mappings still use that domain or its subdomains — disconnect those mappings first.
+
+A home can register multiple base domains. Subdomains do not need to be registered separately — once `example.com` is registered, the home can freely create proxy entries for `blog.example.com`, `api.example.com`, etc.
 
 ### Obtaining a TLS certificate
 
@@ -304,19 +334,23 @@ python manage.py migrate
 python manage.py runserver 0.0.0.0:8001
 ```
 
-### 6. Add a domain and proxy entry
+### 6. Register a base domain
+
+Go to `http://localhost:8001/` (the dashboard) and click **Register base domain**. Enter `mysite.example.com` and submit. This registers the domain with the cloud server; the home is now authorised to create proxy mappings for it and any of its subdomains.
+
+### 7. Add a domain and proxy entry
 
 Go to `http://localhost:8001/domains/add/` and enter `mysite.example.com`. From the domain detail page click **Add** to create a proxy entry — choose scheme `http` and the port certbot will listen on (e.g. `8082`).
 
-### 7. Open the tunnel and obtain a TLS certificate
+### 8. Open the tunnel and obtain a TLS certificate
 
 From the proxy entry detail page click **Open tunnel**, then enter your email and click **Issue certificate**. Wait for certbot to complete — the domain record is updated with the cert path on success.
 
-### 8. Open the tunnel for production traffic
+### 9. Open the tunnel for production traffic
 
 Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future Home Console restart, **Connect all** is the quickest way to bring everything back up.
 
-### 9. Test
+### 10. Test
 
 ```bash
 curl https://mysite.example.com
