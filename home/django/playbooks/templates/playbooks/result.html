@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{ playbook_name }} — result</title></head>
+<body>
+<h1>{{ playbook_name }}</h1>
+<p><a href="{% url 'playbook_index' %}">Playbooks</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
+
+{% if result.success %}
+  <p><strong>Completed successfully.</strong></p>
+{% else %}
+  <p><strong>Failed at: {{ result.failed_step.name }}</strong></p>
+{% endif %}
+
+<table>
+  <thead><tr><th>Step</th><th>Status</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for step in result.steps %}
+      <tr>
+        <td>{{ step.name }}</td>
+        <td>
+          {% if step.status == 'ok' %}✓
+          {% elif step.status == 'error' %}✗
+          {% else %}—
+          {% endif %}
+        </td>
+        <td>{{ step.detail }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if result.success %}
+  <p>Certificate issued for <strong>{{ domain_name }}</strong>. You can now <a href="{% url 'domain_list' %}">add an HTTPS proxy entry</a> to serve traffic.</p>
+{% else %}
+  {% if result.entry %}
+    <p>The temporary proxy entry is still active — <a href="{% url 'proxy_entry_detail' result.entry.pk %}">inspect it</a> or retry certbot manually from there.</p>
+  {% endif %}
+  <p><a href="">Run again</a></p>
+{% endif %}
+</body>
+</html>

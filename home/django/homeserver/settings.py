@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'cloudlink.apps.CloudlinkConfig',
     'domains.apps.DomainsConfig',
+    'playbooks.apps.PlaybooksConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

@@ -10,6 +10,8 @@
   </ul>
 {% endif %}
 
+<a href="{% url 'playbook_index' %}">Playbooks</a>
+
 <form method="post" action="{% url 'sync_all' %}" style="display:inline">
   {% csrf_token %}
   <button type="submit">Connect all</button>
@@ -61,8 +63,8 @@
   <p>No base domains registered yet.</p>
 {% endif %}
 
-<h2>HTTP/HTTPS forwards</h2>
-<p><a href="{% url 'domain_list' %}">Manage domains</a></p>
+<h2>HTTP(S) forwarded domains</h2>
+<p><a href="{% url 'domain_list' %}">Manage forwarded domains</a></p>
 {% if domains %}
   <table>
     <thead><tr><th>Name</th><th>Cert status</th><th>Expiry</th><th>Tunnel</th><th>Listening</th></tr></thead>

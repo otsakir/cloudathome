@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><title>Issue certificate</title></head>
+<body>
+<h1>Issue certificate</h1>
+<p><a href="{% url 'playbook_index' %}">Playbooks</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
+
+<p>Obtains a TLS certificate via Let's Encrypt for a domain you own. DNS must already point to the cloud server.</p>
+
+<ol>
+  <li>Registers a temporary HTTP proxy mapping on the cloud server</li>
+  <li>Opens an SSH tunnel to a local certbot port</li>
+  <li>Runs certbot (HTTP-01 challenge through the tunnel)</li>
+  <li>Removes the temporary proxy mapping and tunnel</li>
+</ol>
+
+<p><strong>Note:</strong> This may take up to 60 seconds. Do not navigate away while it is running.</p>
+
+<form method="post">
+  {% csrf_token %}
+  {% for field in form %}
+    <p>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label><br>
+      {{ field }}
+      {% if field.help_text %}<br><small>{{ field.help_text }}</small>{% endif %}
+      {% if field.errors %}<br><strong>{{ field.errors|join:", " }}</strong>{% endif %}
+    </p>
+  {% endfor %}
+  {% if form.non_field_errors %}
+    <p><strong>{{ form.non_field_errors|join:", " }}</strong></p>
+  {% endif %}
+  <button type="submit">Run playbook</button>
+</form>
+</body>
+</html>

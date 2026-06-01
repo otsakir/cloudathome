@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><title>Playbooks</title></head>
+<body>
+<h1>Playbooks</h1>
+<p><a href="{% url 'dashboard' %}">Dashboard</a></p>
+
+<p>Playbooks are multi-step operations that coordinate cloud and local actions on your behalf.</p>
+
+<table>
+  <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+  <tbody>
+    {% for pb in playbooks %}
+      <tr>
+        <td><strong>{{ pb.name }}</strong></td>
+        <td>{{ pb.description }}</td>
+        <td><a href="{% url pb.url_name %}">Run</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</body>
+</html>
