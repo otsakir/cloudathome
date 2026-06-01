@@ -3,7 +3,7 @@
 <head><title>{{ playbook_name }} — result</title></head>
 <body>
 <h1>{{ playbook_name }}</h1>
-<p><a href="{% url 'playbook_index' %}">Playbooks</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
+<p><a href="{% url 'dashboard' %}">Dashboard</a></p>
 
 {% if result.success %}
   <p><strong>Completed successfully.</strong></p>

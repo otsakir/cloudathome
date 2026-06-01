@@ -10,17 +10,6 @@
   </ul>
 {% endif %}
 
-<a href="{% url 'playbook_index' %}">Playbooks</a>
-
-<form method="post" action="{% url 'sync_all' %}" style="display:inline">
-  {% csrf_token %}
-  <button type="submit">Connect all</button>
-</form>
-<form method="post" action="{% url 'disconnect_all' %}" style="display:inline">
-  {% csrf_token %}
-  <button type="submit">Disconnect all</button>
-</form>
-
 <h2>Cloud connection</h2>
 <table>
   <tr><th>CloudServer URL</th><td>{{ config.cloudserver_url }}</td></tr>
@@ -40,8 +29,18 @@
   </tr>
 </table>
 
+<h2>Tunnels</h2>
+<form method="post" action="{% url 'sync_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Connect all</button>
+</form>
+<form method="post" action="{% url 'disconnect_all' %}" style="display:inline">
+  {% csrf_token %}
+  <button type="submit">Disconnect all</button>
+</form>
+
+
 <h2>Base domains</h2>
-<p><a href="{% url 'add_base_domain' %}">Register base domain</a></p>
 {% if base_domains %}
   <table>
     <thead><tr><th>Domain</th><th></th></tr></thead>
@@ -62,9 +61,9 @@
 {% else %}
   <p>No base domains registered yet.</p>
 {% endif %}
+<p><a href="{% url 'add_base_domain' %}">Register base domain</a></p>
 
 <h2>HTTP(S) forwarded domains</h2>
-<p><a href="{% url 'domain_list' %}">Manage forwarded domains</a></p>
 {% if domains %}
   <table>
     <thead><tr><th>Name</th><th>Cert status</th><th>Expiry</th><th>Tunnel</th><th>Listening</th></tr></thead>
@@ -83,9 +82,9 @@
 {% else %}
   <p>No domains yet. <a href="{% url 'add_domain' %}">Add one.</a></p>
 {% endif %}
+<p><a href="{% url 'domain_list' %}">Manage forwarded domains</a></p>
 
 <h2>TCP forwards</h2>
-<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
 {% if tcp_entries %}
   <table>
     <thead><tr><th>Public port</th><th>Home</th><th>Tunnel port</th><th>Status</th><th>Listening</th></tr></thead>
@@ -104,5 +103,21 @@
 {% else %}
   <p>No TCP forwards yet.</p>
 {% endif %}
+<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
+
+<h2>Playbooks</h2>
+<table>
+  <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+  <tbody>
+    {% for pb in playbooks %}
+      <tr>
+        <td><strong>{{ pb.name }}</strong></td>
+        <td>{{ pb.description }}</td>
+        <td><a href="{% url pb.url_name %}">Run</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
 </body>
 </html>
