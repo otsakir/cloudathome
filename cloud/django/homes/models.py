@@ -18,3 +18,12 @@ class Home(models.Model):
     @property
     def get_username(self):
         return tunnel_manager.make_username(home_index=self.home_index, suffix=self.user.username) if self.user else None
+
+
+class HomeBaseDomain(models.Model):
+    home = models.ForeignKey(Home, on_delete=models.CASCADE, related_name='base_domains')
+    domain = models.CharField(max_length=253, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.domain

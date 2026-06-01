@@ -8,8 +8,8 @@ from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySeriali
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
-from homes.services import ElevatedOperations
-from homes.services import HAProxyService
+from homes.models import HomeBaseDomain
+from homes.services import ElevatedOperations, HAProxyService, BaseDomainService
 from homes.tunnels.manage_home import tunnel_manager
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -152,6 +152,12 @@ class ProxyMappingListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if not BaseDomainService.is_authorized(home, host):
+            return Response(
+                {'message': 'host is not under any of your registered base domains'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         used = HAProxyService.get_used_ports()
         try:
             tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
@@ -242,6 +248,45 @@ class ProxyMappingDumpView(APIView):
         except Exception:
             return Response({'message': 'failed to read proxy mappings from haproxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(entries)
+
+
+class BaseDomainListCreateView(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def _get_home(self, home_slug, user):
+        return get_object_or_404(Home, slug=home_slug, user=user)
+
+    def get(self, request, home_slug):
+        home = self._get_home(home_slug, request.user)
+        domains = list(home.base_domains.values('domain', 'created_at').order_by('domain'))
+        return Response(domains)
+
+    def post(self, request, home_slug):
+        home = self._get_home(home_slug, request.user)
+        raw = request.data.get('domain', '')
+        try:
+            domain = BaseDomainService.validate(raw)
+        except ValueError as e:
+            return Response({'message': str(e)}, status=status.HTTP_409_CONFLICT)
+        bd = HomeBaseDomain.objects.create(home=home, domain=domain)
+        return Response({'domain': bd.domain, 'created_at': bd.created_at}, status=status.HTTP_201_CREATED)
+
+
+class BaseDomainDestroyView(APIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, home_slug, domain):
+        home = get_object_or_404(Home, slug=home_slug, user=request.user)
+        bd = get_object_or_404(HomeBaseDomain, home=home, domain=domain.lower())
+        if BaseDomainService.has_active_mappings(home, domain):
+            return Response(
+                {'message': 'remove all proxy mappings under this domain before deleting it'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        bd.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class HomeSyncView(APIView):
