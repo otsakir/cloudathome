@@ -38,6 +38,29 @@
   </tr>
 </table>
 
+<h2>Base domains</h2>
+<p><a href="{% url 'add_base_domain' %}">Register base domain</a></p>
+{% if base_domains %}
+  <table>
+    <thead><tr><th>Domain</th><th></th></tr></thead>
+    <tbody>
+      {% for domain in base_domains %}
+        <tr>
+          <td>{{ domain }}</td>
+          <td>
+            <form method="post" action="{% url 'remove_base_domain' domain %}" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" onclick="return confirm('Remove {{ domain }}? This will fail if active proxy mappings exist under it.')">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No base domains registered yet.</p>
+{% endif %}
+
 <h2>HTTP/HTTPS forwards</h2>
 <p><a href="{% url 'domain_list' %}">Manage domains</a></p>
 {% if domains %}

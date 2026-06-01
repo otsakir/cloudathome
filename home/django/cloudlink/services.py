@@ -46,6 +46,37 @@ class CloudServerClient:
         if resp.status_code != 204:
             raise CloudServerError(f'delete_proxy_mapping failed: {resp.status_code} {resp.text}')
 
+    def list_base_domains(self):
+        resp = requests.get(
+            self._url(f'/api/homes/{get_config().home_slug}/base-domains/'),
+            headers=self._headers(),
+        )
+        if resp.status_code != 200:
+            raise CloudServerError(f'list_base_domains failed: {resp.status_code} {resp.text}')
+        return resp.json()
+
+    def add_base_domain(self, domain):
+        resp = requests.post(
+            self._url(f'/api/homes/{get_config().home_slug}/base-domains/'),
+            headers=self._headers(),
+            json={'domain': domain},
+        )
+        if resp.status_code == 409:
+            raise CloudServerError(resp.json().get('message', 'conflict'))
+        if resp.status_code != 201:
+            raise CloudServerError(f'add_base_domain failed: {resp.status_code} {resp.text}')
+        return resp.json()
+
+    def remove_base_domain(self, domain):
+        resp = requests.delete(
+            self._url(f'/api/homes/{get_config().home_slug}/base-domains/{domain}/'),
+            headers=self._headers(),
+        )
+        if resp.status_code == 409:
+            raise CloudServerError(resp.json().get('message', 'conflict'))
+        if resp.status_code != 204:
+            raise CloudServerError(f'remove_base_domain failed: {resp.status_code} {resp.text}')
+
     def update_bandwidth(self, kbps_or_none):
         resp = requests.patch(
             self._url(f'/api/homes/{get_config().home_slug}/'),
