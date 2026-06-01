@@ -93,7 +93,7 @@ class ProxyEntryCreateView(FormView):
 
         client = CloudServerClient()
         try:
-            result = client.create_proxy_mapping(self.domain.name, form.cleaned_data['scheme'])
+            result = client.create_proxy_mapping(form.cleaned_data['scheme'], host=self.domain.name)
         except CloudServerError as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
