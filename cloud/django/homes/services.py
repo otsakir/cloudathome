@@ -3,6 +3,7 @@ import socket
 import subprocess
 from pathlib import Path
 
+import tldextract
 from django.conf import settings
 
 from cloudserver.settings import CAH_PUBLIC_KEY_STORAGE_PATH
@@ -116,6 +117,60 @@ class HAProxyService:
             elif tunnel_port in tunnel_ports:
                 result.append({'host': entry['host'], 'tunnel_port': tunnel_port, 'scheme': scheme})
         return result
+
+
+class BaseDomainService:
+
+    @staticmethod
+    def validate(domain: str, exclude_home=None):
+        """Validate a candidate base domain and raise ValueError on any violation."""
+        from homes.models import HomeBaseDomain
+
+        domain = domain.strip().lower()
+        ext = tldextract.extract(domain)
+        if not ext.domain or not ext.suffix:
+            raise ValueError(f"'{domain}' is not a registrable domain")
+
+        qs = HomeBaseDomain.objects.all()
+        if exclude_home is not None:
+            qs = qs.exclude(home=exclude_home)
+        for existing in qs.values_list('domain', flat=True):
+            if domain == existing:
+                raise ValueError(f"'{domain}' is already registered")
+            if domain.endswith('.' + existing):
+                raise ValueError(f"'{domain}' falls under already-registered '{existing}'")
+            if existing.endswith('.' + domain):
+                raise ValueError(f"'{existing}' (another home) falls under '{domain}'")
+
+        return domain
+
+    @staticmethod
+    def is_authorized(home, host: str) -> bool:
+        """Return True if host is the base domain or a subdomain of one registered by this home."""
+        host = host.lower()
+        for bd in home.base_domains.values_list('domain', flat=True):
+            if host == bd or host.endswith('.' + bd):
+                return True
+        return False
+
+    @staticmethod
+    def has_active_mappings(home, base_domain: str) -> bool:
+        """Return True if HAProxy has any active mappings under base_domain for this home."""
+        from homes.tunnels.manage_home import tunnel_manager
+        port_base = tunnel_manager.get_home_port_base(home.home_index)
+        tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
+        mappings = HAProxyService.get_home_mappings(
+            port_base,
+            tunnel_manager.config.PORTS_PER_HOME,
+            tcp_public_port_base=tcp_port_base,
+            tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
+        )
+        base_domain = base_domain.lower()
+        for m in mappings:
+            host = (m.get('host') or '').lower()
+            if host and (host == base_domain or host.endswith('.' + base_domain)):
+                return True
+        return False
 
 
 class ElevatedOperations:

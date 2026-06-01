@@ -36,6 +36,7 @@ class OutHomeSerializer(serializers.ModelSerializer):
     port_count = serializers.SerializerMethodField()
     tcp_port_base = serializers.SerializerMethodField()
     tcp_port_count = serializers.SerializerMethodField()
+    base_domains = serializers.SerializerMethodField()
 
     def get_ssh_username(self, obj: Home) -> str:
         return tunnel_manager.make_username(home_index=obj.home_index, suffix=obj.user.username)
@@ -52,6 +53,9 @@ class OutHomeSerializer(serializers.ModelSerializer):
     def get_tcp_port_count(self, obj: Home) -> int:
         return tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME
 
+    def get_base_domains(self, obj: Home) -> list:
+        return list(obj.base_domains.values_list('domain', flat=True))
+
     class Meta:
         model = Home
-        fields = ['slug', 'ssh_username', 'port_base', 'port_count', 'tcp_port_base', 'tcp_port_count', 'bandwidth_limit_kbps']
+        fields = ['slug', 'ssh_username', 'port_base', 'port_count', 'tcp_port_base', 'tcp_port_count', 'bandwidth_limit_kbps', 'base_domains']
