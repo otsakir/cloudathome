@@ -49,6 +49,13 @@ class DashboardView(TemplateView):
         except Exception:
             context['bandwidth_limit_kbps'] = None
             context['base_domains'] = []
+
+        from playbooks.certificate import IssueCertificatePlaybook
+        context['playbooks'] = [
+            {'name': IssueCertificatePlaybook.name,
+             'description': IssueCertificatePlaybook.description,
+             'url_name': 'playbook_issue_certificate'},
+        ]
         return context
 
 
