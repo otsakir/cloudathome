@@ -1,5 +1,8 @@
 from django import forms
+from django.contrib import messages
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import TemplateView, FormView
 
 from cloudlink.config import get_config
@@ -42,8 +45,10 @@ class DashboardView(TemplateView):
         try:
             home = CloudServerClient().get_home()
             context['bandwidth_limit_kbps'] = home.get('bandwidth_limit_kbps')
+            context['base_domains'] = home.get('base_domains', [])
         except Exception:
             context['bandwidth_limit_kbps'] = None
+            context['base_domains'] = []
         return context
 
 
@@ -55,6 +60,33 @@ class SetBandwidthForm(forms.Form):
         label='Bandwidth limit (kbps)',
         help_text='Leave empty to remove the limit. Example: 5000 = 5 Mbps.',
     )
+
+
+class AddBaseDomainForm(forms.Form):
+    domain = forms.CharField(max_length=253, label='Domain name')
+
+
+class AddBaseDomainView(FormView):
+    template_name = 'cloudlink/add_base_domain.html'
+    form_class = AddBaseDomainForm
+    success_url = reverse_lazy('dashboard')
+
+    def form_valid(self, form):
+        try:
+            CloudServerClient().add_base_domain(form.cleaned_data['domain'])
+        except CloudServerError as e:
+            form.add_error('domain', str(e))
+            return self.form_invalid(form)
+        return super().form_valid(form)
+
+
+class RemoveBaseDomainView(View):
+    def post(self, request, domain):
+        try:
+            CloudServerClient().remove_base_domain(domain)
+        except CloudServerError as e:
+            messages.error(request, str(e))
+        return redirect('dashboard')
 
 
 class SetBandwidthView(FormView):

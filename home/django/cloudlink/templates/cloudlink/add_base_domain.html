@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Register base domain</title></head>
+<body>
+<h1>Register base domain</h1>
+<p><a href="{% url 'dashboard' %}">Dashboard</a></p>
+
+<p>Register a domain you own. Once registered, you can create proxy mappings for it and any of its subdomains.</p>
+
+<form method="post">
+  {% csrf_token %}
+  <p>
+    <label for="{{ form.domain.id_for_label }}">{{ form.domain.label }}</label><br>
+    {{ form.domain }}
+    {% if form.domain.errors %}
+      <br><strong>{{ form.domain.errors|join:", " }}</strong>
+    {% endif %}
+  </p>
+  <button type="submit">Register</button>
+</form>
+</body>
+</html>
