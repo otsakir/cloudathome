@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('cloudlink.urls')),
     path('domains/', include('domains.urls')),
+    path('playbooks/', include('playbooks.urls')),
 ]
