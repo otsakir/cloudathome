@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 certs
 var
+cloud/cloud.env

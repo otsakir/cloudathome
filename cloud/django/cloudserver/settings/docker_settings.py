@@ -1,5 +1,4 @@
-from cloudserver.settings.local_settings import *
-
+from cloudserver.settings.base_settings import *
 
 DATABASES = {
     'default': {
@@ -11,4 +10,3 @@ DATABASES = {
 HAPROXY_ENABLED = True
 HAPROXY_API_HOST = 'haproxy'
 HAPROXY_API_PORT = 9999
-

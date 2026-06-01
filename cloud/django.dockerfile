@@ -16,8 +16,8 @@ RUN chmod 600 authorized_keys && chown admin:admin authorized_keys
 
 # set up Django app
 WORKDIR /opt/app
-COPY django/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY django/requirements-prod.txt django/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements-prod.txt
 
 # create django user
 RUN addgroup -S django && adduser -S django -G django
@@ -50,11 +50,14 @@ RUN echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
 # Expose SSH port
 #EXPOSE 22
 
+COPY django /opt/app
+RUN DJANGO_SETTINGS_MODULE=cloudserver.settings.cloud_settings \
+    SECRET_KEY=build-dummy \
+    CLOUD_DOMAIN=build-dummy \
+    python /opt/app/manage.py collectstatic --noinput
+
 COPY docker/django/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-## Start SSH daemon
-#CMD ["/usr/sbin/sshd", "-D"]
-
+COPY docker/django/entrypoint.prod.sh /usr/local/bin/entrypoint.prod.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/entrypoint.prod.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

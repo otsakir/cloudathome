@@ -16,9 +16,8 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
-
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # map host machine to this container to allow accessing http://localhost:8443 now under http://host.docker.internal:8443
+      - "host.docker.internal:host-gateway"
 
   tunnelagent:
     build:
@@ -28,25 +27,12 @@ services:
       haproxy:
         condition: service_healthy
     ports:
-      - 8022:22
-      - 8000:8000
-    environment:
-      DJANGO_SETTINGS_MODULE: cloudserver.settings.docker_settings
+      - "8022:22"
+      - "8000:8000"
     cap_add:
       - NET_ADMIN
     volumes:
-      - ./django:/opt/app
-      - ./django/var:/opt/backend-var
+      - sqlite-data:/opt/backend-var
 
-#  proxyagent:
-#    build:
-#      context: .
-#      dockerfile: proxyagent.dockerfile
-#    ports:
-#      - 8000:8000
-#      - 1122:1122
-#    volumes:
-#      - ./proxyagent-app/backend:/app/backend  # disable this in production mode and COPY 'backend' in proxyagent.dockerfile
-#      - ./docker/haproxy/haproxy.cfg:/etc/haproxy/haproxy.cfg
-#      - haproxy-sockets:/var/lib/haproxy/sockets
-
+volumes:
+  sqlite-data:

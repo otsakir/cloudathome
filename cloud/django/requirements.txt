@@ -2,10 +2,8 @@ asgiref==3.10.0
 requests==2.32.3
 Django==5.2.7
 django-autoslug==1.9.9
-django-filter==25.2
 djangorestframework==3.16.1
 drf-spectacular==0.28.0
-Markdown==3.10
 sqlparse==0.5.3
 filelock==3.29.0
 requests-file==3.0.1

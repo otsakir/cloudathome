@@ -1,0 +1,2 @@
+-r requirements.txt
+Markdown==3.10

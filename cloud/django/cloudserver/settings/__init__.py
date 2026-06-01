@@ -1,1 +1,1 @@
-from cloudserver.settings.local_settings import *
+from cloudserver.settings.base_settings import *

@@ -1,0 +1,12 @@
+services:
+  haproxy:
+    restart: unless-stopped
+
+  tunnelagent:
+    entrypoint: ["/usr/local/bin/entrypoint.prod.sh"]
+    environment:
+      DJANGO_SETTINGS_MODULE: cloudserver.settings.cloud_settings
+    env_file: cloud.env
+    volumes:
+      - /etc/letsencrypt/live/${CLOUD_DOMAIN}:/certs:ro
+    restart: unless-stopped

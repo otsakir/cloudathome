@@ -1,0 +1,7 @@
+services:
+  tunnelagent:
+    environment:
+      DJANGO_SETTINGS_MODULE: cloudserver.settings.docker_settings
+    volumes:
+      - ./django:/opt/app
+      - ./django/var:/opt/backend-var
