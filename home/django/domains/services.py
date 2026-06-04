@@ -152,7 +152,7 @@ class SyncService:
             if entry.scheme == ProxyEntry.SCHEME_TCP:
                 client.delete_proxy_mapping(str(entry.public_port))
             else:
-                client.delete_proxy_mapping(entry.cloudserver_host)
+                client.delete_proxy_mapping(entry.domain.name)
         except Exception:
             pass
 
@@ -160,7 +160,7 @@ class SyncService:
             if entry.scheme == ProxyEntry.SCHEME_TCP:
                 result = client.create_proxy_mapping('tcp', public_port=entry.public_port)
             else:
-                result = client.create_proxy_mapping(entry.scheme, host=entry.cloudserver_host)
+                result = client.create_proxy_mapping(entry.scheme, host=entry.domain.name)
             entry.tunnel_port = result['tunnel_port']
         except CloudServerError:
             entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
@@ -205,7 +205,7 @@ class SyncService:
             if entry.scheme == ProxyEntry.SCHEME_TCP:
                 client.delete_proxy_mapping(str(entry.public_port))
             else:
-                client.delete_proxy_mapping(entry.cloudserver_host)
+                client.delete_proxy_mapping(entry.domain.name)
         except Exception:
             pass
         entry.tunnel_pid = None
@@ -216,7 +216,7 @@ class SyncService:
     def disconnect_all():
         """Close tunnels and remove cloud mappings for every ProxyEntry."""
         from domains.models import ProxyEntry
-        for entry in ProxyEntry.objects.all():
+        for entry in ProxyEntry.objects.select_related('domain').all():
             SyncService.disconnect_entry(entry)
 
 

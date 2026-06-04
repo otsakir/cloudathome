@@ -1,10 +1,11 @@
 import sys
 import secrets
 
-from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView
+from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
 from homes.models import Home
-from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer
+from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer
+
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
@@ -116,15 +117,12 @@ class HomeListCreateAPIView(ListCreateAPIView):
         return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
 
 
-class ProxyMappingListCreateView(APIView):
+class ProxyMappingListView(ListAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def _get_home(self, home_slug, user):
-        return get_object_or_404(Home, slug=home_slug, user=user)
-
-    def get(self, request, home_slug):
-        home = self._get_home(home_slug, request.user)
+    def list(self, request, home_slug):
+        home = get_object_or_404(Home, slug=home_slug, user=request.user)
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         mappings = HAProxyService.get_home_mappings(
@@ -135,29 +133,26 @@ class ProxyMappingListCreateView(APIView):
         )
         return Response(mappings)
 
-    def post(self, request, home_slug):
-        home = self._get_home(home_slug, request.user)
-        scheme = request.data.get('scheme')
+
+@extend_schema(responses={201: WebProxyMappingResponseSerializer})
+class WebProxyMappingCreateView(CreateAPIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProxyMappingHttpSerializer
+
+    def create(self, request, home_slug):
+        home = get_object_or_404(Home, slug=home_slug, user=request.user)
+        s = self.get_serializer(data=request.data)
+        if not s.is_valid():
+            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+        host = s.validated_data['host']
+        scheme = s.validated_data['scheme']
+
+        if not BaseDomainService.is_authorized(home, host):
+            return Response({'message': 'host is not under any of your registered base domains'}, status=status.HTTP_403_FORBIDDEN)
 
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
-
-        if scheme == 'tcp':
-            return self._register_tcp(request, home, port_base, port_max)
-
-        host = request.data.get('host')
-        if not host or scheme not in ('http', 'https'):
-            return Response(
-                {'message': 'host and scheme (http or https) are required'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not BaseDomainService.is_authorized(home, host):
-            return Response(
-                {'message': 'host is not under any of your registered base domains'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         used = HAProxyService.get_used_ports()
         try:
             tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
@@ -171,14 +166,22 @@ class ProxyMappingListCreateView(APIView):
 
         return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme}, status=status.HTTP_201_CREATED)
 
-    def _register_tcp(self, request, home, port_base, port_max):
-        public_port = request.data.get('public_port')
-        if not public_port:
-            return Response({'message': 'public_port is required for tcp scheme'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            public_port = int(public_port)
-        except (TypeError, ValueError):
-            return Response({'message': 'public_port must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+@extend_schema(responses={201: TcpProxyMappingResponseSerializer})
+class TcpProxyMappingCreateView(CreateAPIView):
+    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProxyMappingTcpSerializer
+
+    def create(self, request, home_slug):
+        home = get_object_or_404(Home, slug=home_slug, user=request.user)
+        s = self.get_serializer(data=request.data)
+        if not s.is_valid():
+            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+        public_port = s.validated_data['public_port']
+
+        port_base = tunnel_manager.get_home_port_base(home.home_index)
+        port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
 
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         tcp_port_max = tcp_port_base + tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME
@@ -191,25 +194,11 @@ class ProxyMappingListCreateView(APIView):
         if public_port in HAProxyService.get_used_tcp_public_ports():
             return Response({'message': 'public_port already in use'}, status=status.HTTP_409_CONFLICT)
 
-        tunnel_port = request.data.get('tunnel_port')
         used = HAProxyService.get_used_ports()
-        if tunnel_port is not None:
-            try:
-                tunnel_port = int(tunnel_port)
-            except (TypeError, ValueError):
-                return Response({'message': 'tunnel_port must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
-            if not (port_base <= tunnel_port < port_max):
-                return Response(
-                    {'message': f'tunnel_port must be in range {port_base}–{port_max - 1} for this home'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if tunnel_port in used:
-                return Response({'message': 'tunnel_port already in use'}, status=status.HTTP_409_CONFLICT)
-        else:
-            try:
-                tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
-            except StopIteration:
-                return Response({'message': 'no free tunnel ports available'}, status=status.HTTP_409_CONFLICT)
+        try:
+            tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
+        except StopIteration:
+            return Response({'message': 'no free tunnel ports available'}, status=status.HTTP_409_CONFLICT)
 
         try:
             HAProxyService.add_mapping('tcp', tunnel_port, public_port=public_port)

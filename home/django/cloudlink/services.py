@@ -25,15 +25,14 @@ class CloudServerClient:
         return homes[0]
 
     def create_proxy_mapping(self, scheme, host=None, public_port=None):
+        slug = get_config().home_slug
         if scheme == 'tcp':
-            payload = {'scheme': 'tcp', 'public_port': public_port}
+            url = self._url(f'/api/homes/{slug}/proxy-mappings/tcp/')
+            payload = {'public_port': public_port}
         else:
+            url = self._url(f'/api/homes/{slug}/proxy-mappings/http/')
             payload = {'host': host, 'scheme': scheme}
-        resp = requests.post(
-            self._url(f'/api/homes/{get_config().home_slug}/proxy-mappings/'),
-            headers=self._headers(),
-            json=payload,
-        )
+        resp = requests.post(url, headers=self._headers(), json=payload)
         if resp.status_code != 201:
             raise CloudServerError(f'create_proxy_mapping failed: {resp.status_code} {resp.text}')
         return resp.json()

@@ -51,7 +51,6 @@ class IssueCertificatePlaybook(Playbook):
                 result = CloudServerClient().create_proxy_mapping('http', host=domain_name)
                 entry = ProxyEntry.objects.create(
                     domain=domain,
-                    cloudserver_host=domain_name,
                     tunnel_port=result['tunnel_port'],
                     home_host='localhost',
                     home_port=home_port,

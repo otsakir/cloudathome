@@ -15,7 +15,7 @@ def _delete_proxy_entry(entry):
         TunnelService.close_tunnel(entry.tunnel_pid)
     client = CloudServerClient()
     try:
-        key = str(entry.public_port) if entry.scheme == ProxyEntry.SCHEME_TCP else entry.cloudserver_host
+        key = str(entry.public_port) if entry.scheme == ProxyEntry.SCHEME_TCP else entry.domain.name
         client.delete_proxy_mapping(key)
     except Exception:
         pass
@@ -100,7 +100,6 @@ class ProxyEntryCreateView(FormView):
 
         entry = ProxyEntry.objects.create(
             domain=self.domain,
-            cloudserver_host=self.domain.name,
             tunnel_port=result['tunnel_port'],
             home_host=home_host,
             home_port=home_port,

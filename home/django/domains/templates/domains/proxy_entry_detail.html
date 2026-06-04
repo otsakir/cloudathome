@@ -24,7 +24,7 @@
   {% if object.scheme == 'tcp' %}
     <tr><th>Public port</th><td>{{ object.public_port }}</td></tr>
   {% else %}
-    <tr><th>Host</th><td>{{ object.cloudserver_host }}</td></tr>
+    <tr><th>Host</th><td>{{ object.domain.name }}</td></tr>
   {% endif %}
   <tr><th>Tunnel port</th><td>{{ object.tunnel_port }}</td></tr>
   <tr><th>Home network host</th><td>{{ object.home_host }}</td></tr>

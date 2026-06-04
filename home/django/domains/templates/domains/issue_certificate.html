@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
-<head><title>Issue certificate — {{ entry.cloudserver_host }}</title></head>
+<head><title>Issue certificate — {{ entry.domain.name }}</title></head>
 <body>
-<h1>Issue certificate for {{ entry.cloudserver_host }}</h1>
+<h1>Issue certificate for {{ entry.domain.name }}</h1>
 <p><a href="{% url 'proxy_entry_detail' entry.pk %}">Back to proxy entry</a></p>
 
 {% if form.non_field_errors %}

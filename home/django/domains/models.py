@@ -24,10 +24,8 @@ class Domain(models.Model):
 
 class ProxyEntry(models.Model):
     """
-    Holds information about a tunnel including dynamic properties. Tunnel ports (cloud side and home side), entry
-    point hostname (cloudserver_host) and scheme (http/https). When the ssh tunnel is in place it also contains the pid
-    of the ssh process.
-
+    Holds information about a tunnel including dynamic properties. Tunnel ports (cloud side and home side),
+    scheme (http/https/tcp). When the ssh tunnel is in place it also contains the pid of the ssh process.
     """
     SCHEME_HTTP = 'http'
     SCHEME_HTTPS = 'https'
@@ -43,15 +41,19 @@ class ProxyEntry(models.Model):
         (TUNNEL_ERROR, 'Error'),
     ]
 
-    domain = models.OneToOneField(Domain, null=True, blank=True, on_delete=models.CASCADE, related_name='proxy_entry')
-    cloudserver_host = models.CharField(max_length=253, unique=True, null=True, blank=True)
-    tunnel_port = models.IntegerField()
-    public_port = models.IntegerField(null=True, blank=True)
+    # Common
+    scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
     home_host = models.CharField(max_length=253, default='localhost')
     home_port = models.IntegerField()
-    scheme = models.CharField(max_length=5, choices=SCHEME_CHOICES, default=SCHEME_HTTPS)
+    tunnel_port = models.IntegerField()
     tunnel_pid = models.IntegerField(null=True, blank=True)
     tunnel_status = models.CharField(max_length=6, choices=TUNNEL_STATUS_CHOICES, default=TUNNEL_CLOSED)
+
+    # HTTP/HTTPS only
+    domain = models.OneToOneField(Domain, null=True, blank=True, on_delete=models.CASCADE, related_name='proxy_entry')
+
+    # TCP only
+    public_port = models.IntegerField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -61,4 +63,4 @@ class ProxyEntry(models.Model):
     def __str__(self):
         if self.scheme == self.SCHEME_TCP:
             return f'TCP :{self.public_port} → {self.home_host}:{self.home_port}'
-        return f'{self.cloudserver_host} → {self.home_host}:{self.home_port} ({self.scheme})'
+        return f'{self.domain.name} → {self.home_host}:{self.home_port} ({self.scheme})'

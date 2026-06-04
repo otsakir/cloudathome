@@ -29,6 +29,27 @@ class HomeBandwidthSerializer(serializers.Serializer):
     )
 
 
+class ProxyMappingHttpSerializer(serializers.Serializer):
+    scheme = serializers.ChoiceField(choices=['http', 'https'])
+    host = serializers.CharField(help_text='Hostname to expose (must be under a registered base domain)')
+
+
+class WebProxyMappingResponseSerializer(serializers.Serializer):
+    scheme = serializers.ChoiceField(choices=['http', 'https'])
+    host = serializers.CharField()
+    tunnel_port = serializers.IntegerField()
+
+
+class ProxyMappingTcpSerializer(serializers.Serializer):
+    public_port = serializers.IntegerField(help_text='Public TCP port to expose (must be in this home\'s TCP port range)')
+
+
+class TcpProxyMappingResponseSerializer(serializers.Serializer):
+    scheme = serializers.ChoiceField(choices=['tcp'])
+    public_port = serializers.IntegerField()
+    tunnel_port = serializers.IntegerField()
+
+
 class OutHomeSerializer(serializers.ModelSerializer):
 
     ssh_username = serializers.SerializerMethodField()
