@@ -50,6 +50,15 @@ class TcpProxyMappingResponseSerializer(serializers.Serializer):
     tunnel_port = serializers.IntegerField()
 
 
+class BaseDomainSerializer(serializers.Serializer):
+    domain = serializers.CharField(help_text='e.g. mysite.example.com')
+
+
+class BaseDomainResponseSerializer(serializers.Serializer):
+    domain = serializers.CharField()
+    created_at = serializers.DateTimeField()
+
+
 class OutHomeSerializer(serializers.ModelSerializer):
 
     ssh_username = serializers.SerializerMethodField()

@@ -4,7 +4,7 @@ import secrets
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
 from homes.models import Home
-from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer
+from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer, BaseDomainSerializer, BaseDomainResponseSerializer
 
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
@@ -14,7 +14,8 @@ from homes.services import ElevatedOperations, HAProxyService, BaseDomainService
 from homes.tunnels.manage_home import tunnel_manager
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
+from rest_framework import serializers as drf_serializers
 
 
 
@@ -302,32 +303,44 @@ class ProxyMappingDumpView(APIView):
 @extend_schema_view(
     get=extend_schema(
         tags=['home base domains'],
+        summary='List base domains',
+        description='Returns all base domains registered for this home. Only hostnames under these domains may be used when creating HTTP/HTTPS proxy mappings.',
+        responses={200: BaseDomainResponseSerializer(many=True)},
     ),
     post=extend_schema(
-        tags=['home base domains']
+        tags=['home base domains'],
+        summary='Register a base domain',
+        description=(
+            'Registers a base domain for this home. Once registered, proxy mappings can be created for any hostname under this domain. '
+            'The domain must be registrable (not a bare TLD or public suffix) and must not overlap with a domain already claimed by another home.'
+        ),
+        request=BaseDomainSerializer,
+        responses={
+            201: BaseDomainResponseSerializer,
+            409: OpenApiResponse(description='Domain already claimed or overlaps with another home'),
+        },
     )
 )
-class BaseDomainListCreateView(APIView):
+class BaseDomainListCreateView(ListCreateAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    serializer_class = BaseDomainResponseSerializer
 
-    def _get_home(self, home_slug, user):
-        return get_object_or_404(Home, slug=home_slug, user=user)
+    def get_queryset(self):
+        home = get_object_or_404(Home, slug=self.kwargs['home_slug'], user=self.request.user)
+        return home.base_domains.order_by('domain')
 
-    def get(self, request, home_slug):
-        home = self._get_home(home_slug, request.user)
-        domains = list(home.base_domains.values('domain', 'created_at').order_by('domain'))
-        return Response(domains)
-
-    def post(self, request, home_slug):
-        home = self._get_home(home_slug, request.user)
-        raw = request.data.get('domain', '')
+    def create(self, request, *args, **kwargs):
+        home = get_object_or_404(Home, slug=self.kwargs['home_slug'], user=request.user)
+        s = BaseDomainSerializer(data=request.data)
+        if not s.is_valid():
+            return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
-            domain = BaseDomainService.validate(raw)
+            domain = BaseDomainService.validate(s.validated_data['domain'])
         except ValueError as e:
             return Response({'message': str(e)}, status=status.HTTP_409_CONFLICT)
         bd = HomeBaseDomain.objects.create(home=home, domain=domain)
-        return Response({'domain': bd.domain, 'created_at': bd.created_at}, status=status.HTTP_201_CREATED)
+        return Response(BaseDomainResponseSerializer(bd).data, status=status.HTTP_201_CREATED)
 
 
 
@@ -335,7 +348,15 @@ class BaseDomainDestroyView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=['home base domains'])
+    @extend_schema(
+        tags=['home base domains'],
+        summary='Remove a base domain',
+        description='Removes a registered base domain. All proxy mappings under this domain must be deleted before it can be removed.',
+        responses={
+            204: OpenApiResponse(description='Domain removed'),
+            409: OpenApiResponse(description='Active proxy mappings exist under this domain'),
+        },
+    )
     def delete(self, request, home_slug, domain):
         home = get_object_or_404(Home, slug=home_slug, user=request.user)
         bd = get_object_or_404(HomeBaseDomain, home=home, domain=domain.lower())
