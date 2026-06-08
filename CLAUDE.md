@@ -22,7 +22,7 @@ docker compose -f cloud/compose.yaml up haproxy
 ### Django (local development, outside Docker)
 
 ```bash
-cd cloud/django
+cd cloud/src
 source .venv/bin/activate
 
 # Run dev server
@@ -46,13 +46,13 @@ In local dev `HAPROXY_ENABLED=False` so HAProxy calls are skipped silently.
 ### Home management script (requires sudo)
 
 ```bash
-sudo python cloud/django/homes/tunnels/manage_home.py add <suffix> <home_id> -p <pubkey_file>
-sudo python cloud/django/homes/tunnels/manage_home.py remove <suffix> <home_id>
-sudo python cloud/django/homes/tunnels/manage_home.py update-key <suffix> <home_id> -p <pubkey_file>
-sudo python cloud/django/homes/tunnels/manage_home.py reload
+sudo python cloud/src/homes/tunnels/manage_home.py add <suffix> <home_id> -p <pubkey_file>
+sudo python cloud/src/homes/tunnels/manage_home.py remove <suffix> <home_id>
+sudo python cloud/src/homes/tunnels/manage_home.py update-key <suffix> <home_id> -p <pubkey_file>
+sudo python cloud/src/homes/tunnels/manage_home.py reload
 
-sudo python cloud/django/homes/tunnels/manage_home.py bandwidth set <home_id> --rate <kbps>
-sudo python cloud/django/homes/tunnels/manage_home.py bandwidth unset <home_id>
+sudo python cloud/src/homes/tunnels/manage_home.py bandwidth set <home_id> --rate <kbps>
+sudo python cloud/src/homes/tunnels/manage_home.py bandwidth unset <home_id>
 ```
 
 `add` and `remove` do not reload sshd automatically; `reload` must be called separately (as `ElevatedOperations` in `services.py` does). `remove` also cleans up any bandwidth limit for the home.

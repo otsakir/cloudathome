@@ -16,7 +16,7 @@ RUN chmod 600 authorized_keys && chown admin:admin authorized_keys
 
 # set up Django app
 WORKDIR /opt/app
-COPY django/requirements.txt .
+COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # create django user
@@ -31,7 +31,7 @@ RUN chown -R django:django /var/tunnelagent
 RUN chmod -R 700 /var/tunnelagent
 
 # tunnel users management scripts
-COPY django/homes/tunnels/manage_home.py /usr/local/bin/
+COPY src/homes/tunnels/manage_home.py /usr/local/bin/
 RUN chmod 700 /usr/local/bin/manage_home.py
 COPY ./docker/django/sudoers.d/tunneling /etc/sudoers.d/
 RUN chmod 440 /etc/sudoers.d/tunneling
