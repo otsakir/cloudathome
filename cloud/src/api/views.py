@@ -14,10 +14,26 @@ from homes.services import ElevatedOperations, HAProxyService, BaseDomainService
 from homes.tunnels.manage_home import tunnel_manager
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
 
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['homes'],
+        summary='Get home details',
+        description='Returns connection details for the specified home: SSH username, tunnel port range, TCP public port range, bandwidth limit, and registered base domains.',
+        responses={200: OutHomeSerializer},
+    ),
+    delete=extend_schema(
+        summary='Release home slot',
+        description='Removes the SSH tunnel user and releases the home slot, making it available for other users. All active tunnels and HAProxy mappings must be removed by the home before calling this.',
+        responses={
+            204: OpenApiResponse(description='Home released'),
+            500: OpenApiResponse(description='Failed to remove tunnel user'),
+        },
+    )
+)
 class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -27,7 +43,20 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     def get_queryset(self):
         return Home.objects.filter(user=self.request.user)
 
-    @extend_schema(request=UpdateHomeKeySerializer, responses={200: OutHomeSerializer})
+    @extend_schema(
+        tags=['homes'],
+        summary='Update home',
+        description=(
+            'Updates the SSH public key and/or bandwidth limit for the home. '
+            'Pass `public_key` to rotate the tunnel key, `bandwidth_limit_kbps` to set an egress rate limit (set to null to remove it).'
+        ),
+        request=UpdateHomeKeySerializer,
+        responses={
+            200: OutHomeSerializer,
+            400: OpenApiResponse(description='Invalid field value'),
+            500: OpenApiResponse(description='Failed to apply changes'),
+        },
+    )
     def patch(self, request, *args, **kwargs):
         home = self.get_object()
 
@@ -63,6 +92,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
         return Response(OutHomeSerializer(home).data)
 
+
     def destroy(self, request, *args, **kwargs):
         home = self.get_object()
 
@@ -79,6 +109,14 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['homes'],
+        summary='List assigned homes',
+        description='Returns the home slot assigned to the authenticated user. Currently, a user can hold at most one home at a time.',
+        responses={200: OutHomeSerializer(many=True)},
+    ),
+)
 class HomeListCreateAPIView(ListCreateAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -88,10 +126,17 @@ class HomeListCreateAPIView(ListCreateAPIView):
         return Home.objects.filter(user=self.request.user)
 
     @extend_schema(
+        tags=['homes'],
+        summary='Claim a home slot',
+        description=(
+            'Claims an available home slot and registers the provided SSH public key. '
+            'Returns connection details: SSH username, assigned tunnel port range, TCP public port range, and a unique slug for subsequent API calls. '
+            'Each user may hold at most one home slot.'
+        ),
         request=HomeSerializer,
         responses={
             201: OutHomeSerializer,
-            409: OpenApiResponse(description='No available home slots'),
+            409: OpenApiResponse(description='No available home slots, or user already has a home'),
             500: OpenApiResponse(description='Failed to create tunnel user'),
         },
     )
@@ -117,6 +162,9 @@ class HomeListCreateAPIView(ListCreateAPIView):
         return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=extend_schema(tags=['home proxy mappings'])
+)
 class ProxyMappingListView(ListAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -134,7 +182,12 @@ class ProxyMappingListView(ListAPIView):
         return Response(mappings)
 
 
-@extend_schema(responses={201: WebProxyMappingResponseSerializer})
+@extend_schema_view(
+    post=extend_schema(
+        tags=['home proxy mappings'],
+        responses={201: WebProxyMappingResponseSerializer}
+    )
+)
 class WebProxyMappingCreateView(CreateAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -167,7 +220,12 @@ class WebProxyMappingCreateView(CreateAPIView):
         return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme}, status=status.HTTP_201_CREATED)
 
 
-@extend_schema(responses={201: TcpProxyMappingResponseSerializer})
+@extend_schema_view(
+    post=extend_schema(
+        tags=['home proxy mappings'],
+        responses={201: TcpProxyMappingResponseSerializer}
+    )
+)
 class TcpProxyMappingCreateView(CreateAPIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -208,6 +266,7 @@ class TcpProxyMappingCreateView(CreateAPIView):
         return Response({'public_port': public_port, 'tunnel_port': tunnel_port, 'scheme': 'tcp'}, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(tags=['home proxy mappings'])
 class ProxyMappingDestroyAPIView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -239,6 +298,15 @@ class ProxyMappingDumpView(APIView):
         return Response(entries)
 
 
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=['home base domains'],
+    ),
+    post=extend_schema(
+        tags=['home base domains']
+    )
+)
 class BaseDomainListCreateView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -262,10 +330,12 @@ class BaseDomainListCreateView(APIView):
         return Response({'domain': bd.domain, 'created_at': bd.created_at}, status=status.HTTP_201_CREATED)
 
 
+
 class BaseDomainDestroyView(APIView):
     authentication_classes = [SessionAuthentication, TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(tags=['home base domains'])
     def delete(self, request, home_slug, domain):
         home = get_object_or_404(Home, slug=home_slug, user=request.user)
         bd = get_object_or_404(HomeBaseDomain, home=home, domain=domain.lower())
