@@ -42,12 +42,13 @@ class HAProxyService:
             cls._send_command(f'add map {TCP_MAP_FILE} {public_port} tunnel_{tunnel_port}')
 
     @classmethod
-    def remove_mapping(cls, key):
-        # key is a hostname (http/https) or public port number (tcp).
-        # HAProxy treats del map on a missing key as a no-op, so we try all maps.
-        cls._send_command(f'del map {SNI_MAP_FILE} {key}')
-        cls._send_command(f'del map {HTTP_MAP_FILE} {key}')
-        cls._send_command(f'del map {TCP_MAP_FILE} {key}')
+    def remove_http_mapping(cls, scheme: str, host: str):
+        map_file = SNI_MAP_FILE if scheme == 'https' else HTTP_MAP_FILE
+        cls._send_command(f'del map {map_file} {host}')
+
+    @classmethod
+    def remove_tcp_mapping(cls, public_port: int):
+        cls._send_command(f'del map {TCP_MAP_FILE} {public_port}')
 
     @classmethod
     def dump_mappings(cls):

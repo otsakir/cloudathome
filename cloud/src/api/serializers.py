@@ -30,7 +30,6 @@ class HomeBandwidthSerializer(serializers.Serializer):
 
 
 class ProxyMappingHttpSerializer(serializers.Serializer):
-    scheme = serializers.ChoiceField(choices=['http', 'https'])
     host = serializers.CharField(help_text='Hostname to expose (must be under a registered base domain)')
 
 

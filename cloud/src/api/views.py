@@ -14,7 +14,8 @@ from homes.services import ElevatedOperations, HAProxyService, BaseDomainService
 from homes.tunnels.manage_home import tunnel_manager
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiParameter, inline_serializer
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
 
 
@@ -208,31 +209,34 @@ class ProxyMappingListView(ListAPIView):
         tags=['home proxy mappings'],
         summary='Create an HTTP/HTTPS proxy mapping',
         description=(
-            'Allocates a tunnel port and registers an HTTP or HTTPS forwarding rule in HAProxy for the given hostname. '
+            'Allocates a tunnel port and registers a forwarding rule in HAProxy for the given scheme and hostname. '
+            'The scheme is specified as a URL path segment (`http` or `https`). '
             'The hostname must be the base domain or a subdomain of one already registered for this home. '
-            'Each scheme (http/https) may have at most one active mapping per hostname.'
+            'Each scheme may have at most one active mapping per hostname.'
         ),
         request=ProxyMappingHttpSerializer,
         responses={
             201: WebProxyMappingResponseSerializer,
             403: OpenApiResponse(description='Host is not under any registered base domain'),
+            404: OpenApiResponse(description='Unknown scheme (must be http or https)'),
             409: OpenApiResponse(description='Mapping for this host and scheme already exists, or no free tunnel ports'),
             500: OpenApiResponse(description='Failed to configure HAProxy'),
         },
     )
 )
-class WebProxyMappingCreateView(CreateAPIView):
+class SchemeProxyMappingCreateView(CreateAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingHttpSerializer
 
-    def create(self, request, home_slug):
+    def create(self, request, home_slug, scheme):
+        if scheme not in ('http', 'https'):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         home = get_object_or_404(Home, slug=home_slug, user=request.user)
         s = self.get_serializer(data=request.data)
         if not s.is_valid():
             return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
         host = s.validated_data['host']
-        scheme = s.validated_data['scheme']
 
         if not BaseDomainService.is_authorized(home, host):
             return Response({'message': 'host is not under any of your registered base domains'}, status=status.HTTP_403_FORBIDDEN)
@@ -316,24 +320,51 @@ class TcpProxyMappingCreateView(CreateAPIView):
 
 @extend_schema(
     tags=['home proxy mappings'],
-    summary='Delete a proxy mapping',
-    description=(
-        'Removes an active HAProxy forwarding rule by key. '
-        'For HTTP/HTTPS mappings the key is the hostname; for TCP mappings it is the public port number.'
-    ),
+    summary='Delete an HTTP/HTTPS proxy mapping',
+    description='Removes the HAProxy forwarding rule for the given scheme and hostname. Scheme must be `http` or `https`.',
     responses={
         204: OpenApiResponse(description='Mapping removed'),
+        404: OpenApiResponse(description='Unknown scheme, or no active mapping for this host'),
         500: OpenApiResponse(description='Failed to remove mapping from HAProxy'),
     },
 )
-class ProxyMappingDestroyAPIView(APIView):
+class SchemeProxyMappingDestroyAPIView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, home_slug, key):
+    def delete(self, request, home_slug, scheme, host):
+        if scheme not in ('http', 'https'):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         get_object_or_404(Home, slug=home_slug, user=request.user)
+        if host not in HAProxyService.get_used_hosts(scheme):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            HAProxyService.remove_mapping(key)
+            HAProxyService.remove_http_mapping(scheme, host)
+        except Exception:
+            return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    tags=['home proxy mappings'],
+    summary='Delete a TCP proxy mapping',
+    description='Removes the TCP HAProxy forwarding rule for the given public port.',
+    responses={
+        204: OpenApiResponse(description='Mapping removed'),
+        404: OpenApiResponse(description='No active mapping for this port'),
+        500: OpenApiResponse(description='Failed to remove mapping from HAProxy'),
+    },
+)
+class TcpProxyMappingDestroyAPIView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, home_slug, port):
+        get_object_or_404(Home, slug=home_slug, user=request.user)
+        if port not in HAProxyService.get_used_tcp_public_ports():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            HAProxyService.remove_tcp_mapping(port)
         except Exception:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(status=status.HTTP_204_NO_CONTENT)
