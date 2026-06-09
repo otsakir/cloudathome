@@ -44,6 +44,18 @@ This starts two containers:
 
 HAProxy must pass its health check before `tunnelagent` starts.
 
+Access swagger page at
+
+```commandline
+http://localhost:8000/api/schema/swagger/
+```
+
+Access django administrator at
+```commandline
+http://localhost:8000/admin/login/
+```
+
+
 ### First-time database setup
 
 ```bash
@@ -51,7 +63,7 @@ docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py 
 docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
 ```
 
-The SQLite database is stored outside the container at `cloud/django/var/db.sqlite3`.
+The SQLite database is stored outside the container at `cloud/src/var/db.sqlite3`.
 
 The `migrate` step also provisions the 10 home slots (indices 0–9) automatically via the data migration `homes/migrations/0003_provision_homes.py`.
 
