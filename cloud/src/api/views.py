@@ -164,7 +164,27 @@ class HomeListCreateAPIView(ListCreateAPIView):
 
 
 @extend_schema_view(
-    get=extend_schema(tags=['home proxy mappings'])
+    get=extend_schema(
+        tags=['home proxy mappings'],
+        summary='List active proxy mappings',
+        description=(
+            'Returns all active HAProxy mappings for this home, sourced live from HAProxy. '
+            'HTTP/HTTPS entries include `host`, `tunnel_port`, and `scheme`. '
+            'TCP entries include `public_port`, `tunnel_port`, and `scheme`.'
+        ),
+        responses={
+            200: inline_serializer(
+                name='ProxyMappingEntry',
+                many=True,
+                fields={
+                    'scheme': drf_serializers.ChoiceField(choices=['http', 'https', 'tcp']),
+                    'tunnel_port': drf_serializers.IntegerField(),
+                    'host': drf_serializers.CharField(required=False, help_text='HTTP/HTTPS mappings only'),
+                    'public_port': drf_serializers.IntegerField(required=False, help_text='TCP mappings only'),
+                },
+            ),
+        },
+    )
 )
 class ProxyMappingListView(ListAPIView):
     authentication_classes = [TokenAuthentication]
@@ -186,7 +206,19 @@ class ProxyMappingListView(ListAPIView):
 @extend_schema_view(
     post=extend_schema(
         tags=['home proxy mappings'],
-        responses={201: WebProxyMappingResponseSerializer}
+        summary='Create an HTTP/HTTPS proxy mapping',
+        description=(
+            'Allocates a tunnel port and registers an HTTP or HTTPS forwarding rule in HAProxy for the given hostname. '
+            'The hostname must be the base domain or a subdomain of one already registered for this home. '
+            'Each scheme (http/https) may have at most one active mapping per hostname.'
+        ),
+        request=ProxyMappingHttpSerializer,
+        responses={
+            201: WebProxyMappingResponseSerializer,
+            403: OpenApiResponse(description='Host is not under any registered base domain'),
+            409: OpenApiResponse(description='Mapping for this host and scheme already exists, or no free tunnel ports'),
+            500: OpenApiResponse(description='Failed to configure HAProxy'),
+        },
     )
 )
 class WebProxyMappingCreateView(CreateAPIView):
@@ -204,6 +236,9 @@ class WebProxyMappingCreateView(CreateAPIView):
 
         if not BaseDomainService.is_authorized(home, host):
             return Response({'message': 'host is not under any of your registered base domains'}, status=status.HTTP_403_FORBIDDEN)
+
+        if host in HAProxyService.get_used_hosts(scheme):
+            return Response({'message': 'a mapping for this host already exists'}, status=status.HTTP_409_CONFLICT)
 
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
@@ -224,7 +259,19 @@ class WebProxyMappingCreateView(CreateAPIView):
 @extend_schema_view(
     post=extend_schema(
         tags=['home proxy mappings'],
-        responses={201: TcpProxyMappingResponseSerializer}
+        summary='Create a TCP proxy mapping',
+        description=(
+            'Allocates a tunnel port and registers a TCP forwarding rule in HAProxy for the given public port. '
+            'The public port must be within this home\'s assigned TCP port range (returned by the homes endpoint). '
+            'Each public port may have at most one active mapping.'
+        ),
+        request=ProxyMappingTcpSerializer,
+        responses={
+            201: TcpProxyMappingResponseSerializer,
+            400: OpenApiResponse(description='public_port is outside this home\'s TCP port range'),
+            409: OpenApiResponse(description='public_port already in use, or no free tunnel ports'),
+            500: OpenApiResponse(description='Failed to configure HAProxy'),
+        },
     )
 )
 class TcpProxyMappingCreateView(CreateAPIView):
@@ -267,7 +314,18 @@ class TcpProxyMappingCreateView(CreateAPIView):
         return Response({'public_port': public_port, 'tunnel_port': tunnel_port, 'scheme': 'tcp'}, status=status.HTTP_201_CREATED)
 
 
-@extend_schema(tags=['home proxy mappings'])
+@extend_schema(
+    tags=['home proxy mappings'],
+    summary='Delete a proxy mapping',
+    description=(
+        'Removes an active HAProxy forwarding rule by key. '
+        'For HTTP/HTTPS mappings the key is the hostname; for TCP mappings it is the public port number.'
+    ),
+    responses={
+        204: OpenApiResponse(description='Mapping removed'),
+        500: OpenApiResponse(description='Failed to remove mapping from HAProxy'),
+    },
+)
 class ProxyMappingDestroyAPIView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]

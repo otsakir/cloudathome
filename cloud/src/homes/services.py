@@ -78,6 +78,11 @@ class HAProxyService:
         return used
 
     @classmethod
+    def get_used_hosts(cls, scheme):
+        """Return the set of hostnames currently registered for the given scheme (http or https)."""
+        return {entry['host'] for entry in cls.dump_mappings() if entry.get('scheme') == scheme}
+
+    @classmethod
     def get_used_tcp_public_ports(cls):
         """Return the set of public TCP ports currently registered in the TCP map."""
         used = set()
