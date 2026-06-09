@@ -12,7 +12,7 @@ from rest_framework import status
 from homes.models import HomeBaseDomain
 from homes.services import ElevatedOperations, HAProxyService, BaseDomainService
 from homes.tunnels.manage_home import tunnel_manager
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
 from rest_framework import serializers as drf_serializers
@@ -36,7 +36,7 @@ from rest_framework import serializers as drf_serializers
     )
 )
 class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OutHomeSerializer
     lookup_field = 'slug'
@@ -119,7 +119,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
     ),
 )
 class HomeListCreateAPIView(ListCreateAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OutHomeSerializer
 
@@ -167,7 +167,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
     get=extend_schema(tags=['home proxy mappings'])
 )
 class ProxyMappingListView(ListAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def list(self, request, home_slug):
@@ -190,7 +190,7 @@ class ProxyMappingListView(ListAPIView):
     )
 )
 class WebProxyMappingCreateView(CreateAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingHttpSerializer
 
@@ -228,7 +228,7 @@ class WebProxyMappingCreateView(CreateAPIView):
     )
 )
 class TcpProxyMappingCreateView(CreateAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = ProxyMappingTcpSerializer
 
@@ -269,7 +269,7 @@ class TcpProxyMappingCreateView(CreateAPIView):
 
 @extend_schema(tags=['home proxy mappings'])
 class ProxyMappingDestroyAPIView(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, home_slug, key):
@@ -288,7 +288,7 @@ class ProxyInstanceAPIView(APIView):
 
 
 class ProxyMappingDumpView(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAdminUser]
 
     def get(self, request):
@@ -322,7 +322,7 @@ class ProxyMappingDumpView(APIView):
     )
 )
 class BaseDomainListCreateView(ListCreateAPIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = BaseDomainResponseSerializer
 
@@ -345,7 +345,7 @@ class BaseDomainListCreateView(ListCreateAPIView):
 
 
 class BaseDomainDestroyView(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -370,7 +370,7 @@ class BaseDomainDestroyView(APIView):
 
 
 class HomeSyncView(APIView):
-    authentication_classes = [SessionAuthentication, TokenAuthentication]
+    authentication_classes = [TokenAuthentication]
     permission_classes = [IsAdminUser]
 
     def post(self, request):
