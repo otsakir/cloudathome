@@ -1,4 +1,27 @@
 #!/usr/bin/env python3
+"""
+manage_home.py — privileged tunnel-user management script
+
+Runs as root (via a tightly scoped sudoers rule). Django's ElevatedOperations
+class invokes it with sudo; nothing else should call it directly.
+
+High-level operations
+---------------------
+TunnelManager
+  add / remove a system user for a home network:
+    - create/delete the Linux user account (useradd/userdel)
+    - install or revoke the SSH public key (~/.ssh/authorized_keys)
+    - write or delete a per-user sshd Match block under sshd_config.d/
+      (ForceCommand /bin/false, PermitTTY no, PermitListen on allocated ports)
+    - add or remove the username from the shared AllowUsers directive
+  reload  — send SIGHUP to sshd so config changes take effect
+
+BandwidthManager
+  set / unset a per-home egress bandwidth cap:
+    - create/update/delete an HTB tc class on the outbound network interface
+    - add/remove an iptables MARK rule that steers the home's tunnel ports
+      into that tc class
+"""
 
 import argparse
 import re
