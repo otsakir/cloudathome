@@ -77,7 +77,7 @@ class TunnelManager:
         config_file = open(f'{self.config.SSHD_CONFIGD_PATH}/01-allowed_users.conf', 'r+')
 
         content = config_file.read().strip()
-        m = re.match(rf'AllowUsers\s.* {username}( \S+)?$', content)
+        m = re.match(rf'AllowUsers\s(.*\s)?{username}(\s|$)', content)
         if m:
             print(f"user '{username}' is already in sshd_config AllowedUsers", file=sys.stderr)
             return False
