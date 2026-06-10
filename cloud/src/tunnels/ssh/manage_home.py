@@ -66,11 +66,14 @@ class BandwidthError(HomeScriptError):
 
 
 class TunnelManager:
+    """Manages the lifecycle of SSH tunnel users: creates and removes system accounts,
+    writes per-user sshd Match blocks, and maintains the AllowUsers directive."""
 
     def __init__(self, config: Config = None):
         self.config = config or Config()
 
     def add_username_to_allow_users(self, username: str):
+        """Appends username to the AllowUsers directive. Returns False if already present."""
         config_file = open(f'{self.config.SSHD_CONFIGD_PATH}/01-allowed_users.conf', 'r+')
 
         content = config_file.read().strip()
@@ -87,6 +90,7 @@ class TunnelManager:
         return True
 
     def remove_username_from_allow_users(self, username: str):
+        """Removes username from the AllowUsers directive. Returns False if not found."""
         config_file = open(f'{self.config.SSHD_CONFIGD_PATH}/01-allowed_users.conf', 'r+')
 
         content = config_file.read().strip()
@@ -106,6 +110,7 @@ class TunnelManager:
         return f'{self.config.SSHD_CONFIGD_PATH}/{username}.conf'
 
     def add_user_sshdconfig(self, username: str, port_base: int):
+        """Writes a per-user Match block restricting the account to TCP port forwarding only."""
         config_file = open(self.get_user_sshdconfig_filename(username), 'w')
         config_file.write(f'Match User {username}\n')
         listen_ports = " ".join([
@@ -114,6 +119,8 @@ class TunnelManager:
         ])
         config_file.write(f'    PermitListen {listen_ports}\n')
         config_file.write(f'    PermitTTY no\n')
+        # ForceCommand is required even with PermitListen: without it the user could
+        # still open exec channels (shell, sftp) over the same key.
         config_file.write(f'    ForceCommand /bin/false\n')
         config_file.close()
 
@@ -125,6 +132,7 @@ class TunnelManager:
             print(f"error removing user specific ssh file '{config_filename}'", file=sys.stderr)
 
     def make_username(self, home_index: int, suffix: str) -> str:
+        """Returns the canonical system username for a home slot, e.g. 'home03_alice'."""
         if 0 <= home_index < self.config.MAX_HOME_COUNT:
             m = re.match(rf'^{self.config.USERNAME_SUFFIX_PATTERN}$', suffix)
             if m:
@@ -135,12 +143,15 @@ class TunnelManager:
             raise UserError('bad home index')
 
     def get_home_port_base(self, home_id: int):
+        # Stride is PORTS_PER_HOME_RESERVED (100), not PORTS_PER_HOME (10), giving each
+        # home headroom to expand without renumbering all subsequent homes.
         return self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
 
     def get_home_tcp_public_port_base(self, home_id: int):
         return self.config.TCP_PUBLIC_PORTS_BASE + home_id * self.config.TCP_PUBLIC_PORTS_PER_HOME
 
     def create_tunnel_user(self, username: str, public_key_filename: str):
+        """Creates a system user and installs the SSH public key from the staging area."""
         result = _run(['adduser', '-D', username])
         if result.returncode != 0:
             raise UserError('error creating user')
@@ -156,9 +167,11 @@ class TunnelManager:
         shutil.chown(f'/home/{username}/.ssh/authorized_keys', username, username)
 
     def drop_tunnel_user(self, username: str):
+        """Deletes the system user and removes its home directory."""
         result = _run(['deluser', username])
         if result.returncode != 0:
             print(f'could not remove user {username}, assuming already absent', file=sys.stderr)
+        # Safety guard before rmtree: a wrong username here would silently delete an unrelated home directory.
         assert username.startswith(self.config.HOME_PREFIX)
         try:
             shutil.rmtree(f'/home/{username}/')
@@ -176,13 +189,16 @@ class TunnelManager:
             raise HomeScriptError('error reloading sshd configuration')
 
     def update_tunnel_user_key(self, username: str, public_key_filename: str):
+        """Replaces the authorized_keys file for an existing tunnel user."""
         dest = f'/home/{username}/.ssh/authorized_keys'
         shutil.copy(f'{self.config.PUBLIC_KEY_STORAGE_PATH}/{public_key_filename}', dest)
         os.chmod(dest, 0o600)
         shutil.chown(dest, username, username)
 
     def enable_user(self, username: str):
+        """Unlocks the account for SSH key auth; adduser -D creates it with login disabled."""
         # Pass credentials via stdin to avoid shell=True with username interpolation.
+        # '*' as the pre-encrypted hash disables password login while keeping key-based auth working.
         result = _run(
             ['chpasswd', '-e'],
             input=f'{username}:*\n',
@@ -206,12 +222,14 @@ class BandwidthManager:
         return self.config.NETWORK_INTERFACE
 
     def _classid(self, home_id: int) -> str:
+        # HTB class IDs within a major number must be non-zero; +1 maps home 0 → 1:1.
         return f'1:{home_id + 1}'
 
     def _mark(self, home_id: int) -> int:
         return home_id + 1
 
     def _port_range(self, home_id: int):
+        # Returns inclusive [lo, hi]; iptables --sport requires a closed range.
         base = self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
         return base, base + self.config.PORTS_PER_HOME - 1
 
@@ -221,6 +239,8 @@ class BandwidthManager:
             capture_output=True, text=True,
         )
         if 'htb 1:' not in result.stdout:
+            # 'default 999' routes unclassified traffic (homes without a bandwidth limit)
+            # to a non-existent class, which HTB treats as best-effort pass-through.
             _run(
                 ['/sbin/tc', 'qdisc', 'add', 'dev', self._iface(),
                  'root', 'handle', '1:', 'htb', 'default', '999'],
@@ -235,6 +255,7 @@ class BandwidthManager:
         return self._classid(home_id) in result.stdout
 
     def set_bandwidth(self, home_id: int, rate_kbps: int):
+        """Creates or updates the HTB class and iptables mark rule for home_id at rate_kbps."""
         self._ensure_root_qdisc()
 
         iface = self._iface()
@@ -271,11 +292,14 @@ class BandwidthManager:
             )
 
     def unset_bandwidth(self, home_id: int):
+        """Removes the HTB class and iptables mark rule for home_id. Safe to call when no limit is set."""
         iface = self._iface()
         classid = self._classid(home_id)
         mark = self._mark(home_id)
         port_lo, port_hi = self._port_range(home_id)
 
+        # Remove the iptables mark rule first so no new packets get classified
+        # into the tc class we are about to delete.
         _run(
             ['/usr/sbin/iptables', '-t', 'mangle', '-D', 'OUTPUT',
              '-p', 'tcp',

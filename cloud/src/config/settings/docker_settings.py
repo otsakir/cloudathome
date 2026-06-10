@@ -1,4 +1,4 @@
-from cloudserver.settings.local_settings import *
+from config.settings.local_settings import *
 
 
 DATABASES = {

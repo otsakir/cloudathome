@@ -32,8 +32,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'homes.apps.HomesConfig',
-    'api.apps.ApiConfig',
+    'tunnels.apps.TunnelsConfig',
     'web.apps.WebConfig',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -73,7 +72,7 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
 }
 
-ROOT_URLCONF = 'cloudserver.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -90,7 +89,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'cloudserver.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database

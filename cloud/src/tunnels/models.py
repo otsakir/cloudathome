@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-from homes.tunnels.manage_home import tunnel_manager
+from tunnels.ssh.manage_home import tunnel_manager
 
 
 class Home(models.Model):

@@ -6,7 +6,7 @@ from pathlib import Path
 import tldextract
 from django.conf import settings
 
-from cloudserver.settings import CAH_PUBLIC_KEY_STORAGE_PATH
+from config.settings import CAH_PUBLIC_KEY_STORAGE_PATH
 
 
 SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
@@ -130,7 +130,7 @@ class BaseDomainService:
     @staticmethod
     def validate(domain: str, exclude_home=None):
         """Validate a candidate base domain and raise ValueError on any violation."""
-        from homes.models import HomeBaseDomain
+        from tunnels.models import HomeBaseDomain
 
         domain = domain.strip().lower()
         ext = tldextract.extract(domain)
@@ -162,7 +162,7 @@ class BaseDomainService:
     @staticmethod
     def has_active_mappings(home, base_domain: str) -> bool:
         """Return True if HAProxy has any active mappings under base_domain for this home."""
-        from homes.tunnels.manage_home import tunnel_manager
+        from tunnels.ssh.manage_home import tunnel_manager
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         mappings = HAProxyService.get_home_mappings(

@@ -31,7 +31,7 @@ services:
       - 8022:22
       - 8000:8000
     environment:
-      DJANGO_SETTINGS_MODULE: cloudserver.settings.docker_settings
+      DJANGO_SETTINGS_MODULE: config.settings.docker_settings
     cap_add:
       - NET_ADMIN
     volumes:

@@ -9,9 +9,9 @@ from django.db import transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
-from homes.models import Home
-from homes.services import ElevatedOperations, HAProxyService
-from homes.tunnels.manage_home import tunnel_manager
+from tunnels.models import Home
+from tunnels.services import ElevatedOperations, HAProxyService
+from tunnels.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, RegisterHomeForm, AddMappingForm
 
 

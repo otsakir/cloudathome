@@ -1,7 +1,7 @@
 import argparse
 
 from django.test import SimpleTestCase
-from homes.tunnels.manage_home import Config, TunnelManager, _build_parser
+from tunnels.ssh.manage_home import Config, TunnelManager, _build_parser
 import os
 import shutil
 from argparse import ArgumentParser

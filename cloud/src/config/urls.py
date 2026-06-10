@@ -21,9 +21,9 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('web.urls')),
-    path('', include('api.urls')),
+    path('', include('tunnels.urls')),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
 ]
 
 if settings.DEBUG:
-    urlpatterns += [path('', include('cloudserver.debug_urls'))]
+    urlpatterns += [path('', include('config.debug_urls'))]

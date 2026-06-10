@@ -3,8 +3,8 @@ import re
 from django import forms
 from django.contrib.auth.models import User
 
-from homes.services import HAProxyService
-from homes.tunnels.manage_home import Config, tunnel_manager
+from tunnels.services import HAProxyService
+from tunnels.ssh.manage_home import Config, tunnel_manager
 
 _USERNAME_PATTERN = re.compile(f'^{Config.USERNAME_SUFFIX_PATTERN}$')
 

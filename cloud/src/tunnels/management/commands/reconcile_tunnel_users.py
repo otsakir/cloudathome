@@ -3,8 +3,8 @@ import pwd
 from django.core.management.base import BaseCommand
 from django.db import OperationalError, ProgrammingError
 
-from homes.models import Home
-from homes.services import ElevatedOperations
+from tunnels.models import Home
+from tunnels.services import ElevatedOperations
 
 
 class Command(BaseCommand):
