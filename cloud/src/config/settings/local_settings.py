@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'tunnels.apps.TunnelsConfig',
+    'api.apps.ApiConfig',
     'web.apps.WebConfig',
     'django.contrib.admin',
     'django.contrib.auth',

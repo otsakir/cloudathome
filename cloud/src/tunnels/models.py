@@ -25,5 +25,8 @@ class HomeBaseDomain(models.Model):
     domain = models.CharField(max_length=253, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        verbose_name_plural = 'Base domains'
+
     def __str__(self):
         return self.domain
