@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+
+{% block title %}Client configuration — CloudAtHome{% endblock %}
+
+{% block content %}
+
+<h1>Client configuration</h1>
+<p>
+<a download="config.yaml" href="data:text/yaml;charset=utf-8,{{ config_yaml|urlencode }}">Download</a> or
+    save the following snippet as <code>config.yaml</code> at the root of the
+client repository.
+</p>
+
+
+<textarea readonly rows="20" cols="80">{{ config_yaml }}</textarea>
+    <p>Fill in <code>private_key_path</code> and <code>auth_token</code>
+fields before running the client. <a href="/home/token/rotate/">Generate a brand new token</a> if you need to.</p>
+<p>
+
+</p>
+
+<p><a href="{% url 'dashboard' %}">Back to dashboard</a></p>
+{% endblock %}

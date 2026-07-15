@@ -6,13 +6,14 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth.views import LoginView as AuthLoginView
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect, render, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
 from tunnels.models import Home
 from tunnels.services import ElevatedOperations, HAProxyService
 from tunnels.ssh.manage_home import tunnel_manager
-from web.forms import SignupForm, RegisterHomeForm, AddMappingForm
+from web.forms import SignupForm, RegisterHomeForm, UpdatePublicKeyForm, AddMappingForm
+from web.services import HomeConfigService
 
 
 class HomeOwnerMixin(LoginRequiredMixin):
@@ -103,13 +104,19 @@ class RegisterHomeView(HomeOwnerMixin, FormView):
             available_home.slug = secrets.token_urlsafe(16)
             available_home.save()
 
-        messages.success(self.request, 'Home registered successfully.')
-        return redirect('dashboard')
+        token = HomeConfigService.get_or_create_token(self.request.user)
+        config_yaml = HomeConfigService.build_yaml(
+            self.request, available_home, token.key, form.cleaned_data.get('private_key_path'),
+        )
+        return render(self.request, 'web/home_config.html', {
+            'home': available_home,
+            'config_yaml': config_yaml,
+        })
 
 
 class EditHomeView(HomeOwnerMixin, FormView):
     template_name = 'web/edit_home.html'
-    form_class = RegisterHomeForm
+    form_class = UpdatePublicKeyForm
 
     def get_home(self):
         return get_object_or_404(Home, user=self.request.user)
@@ -159,6 +166,36 @@ class ReleaseHomeView(HomeOwnerMixin, TemplateView):
 
         messages.success(request, 'Home released.')
         return redirect('dashboard')
+
+
+class ClientConfigView(HomeOwnerMixin, TemplateView):
+    template_name = 'web/client_config.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        home = get_object_or_404(Home, user=self.request.user)
+        token = HomeConfigService.get_or_create_token(self.request.user)
+        context['home'] = home
+        context['config_yaml'] = HomeConfigService.build_yaml(self.request, home, token.key, redact=True)
+        return context
+
+
+class RotateTokenView(HomeOwnerMixin, TemplateView):
+    template_name = 'web/rotate_token.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['home'] = get_object_or_404(Home, user=self.request.user)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        home = get_object_or_404(Home, user=request.user)
+        token = HomeConfigService.rotate_token(request.user)
+        messages.success(request, 'Token rotated. The old token no longer works.')
+        return render(request, 'web/token_rotated.html', {
+            'home': home,
+            'token': token.key,
+        })
 
 
 class AddMappingView(HomeOwnerMixin, FormView):

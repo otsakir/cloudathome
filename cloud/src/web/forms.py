@@ -33,11 +33,23 @@ class SignupForm(forms.Form):
         return cleaned
 
 
-class RegisterHomeForm(forms.Form):
+class UpdatePublicKeyForm(forms.Form):
     public_key = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 4}),
         label='SSH public key',
         max_length=800,
+    )
+
+
+class RegisterHomeForm(UpdatePublicKeyForm):
+    private_key_path = forms.CharField(
+        required=False,
+        max_length=500,
+        label='Local private key path',
+        help_text=(
+            'Path to the matching private key on your home machine (from generate_keys.py). '
+            'Only used to pre-fill the generated config.yaml below — not stored on the server.'
+        ),
     )
 
 

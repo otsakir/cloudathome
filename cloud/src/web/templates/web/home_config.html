@@ -1,0 +1,21 @@
+{% extends "web/base.html" %}
+
+{% block title %}Home config — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Home registered</h1>
+<p>
+  Home slot <strong>{{ home.home_index }}</strong> is ready
+  (SSH username: <code>{{ home.get_username }}</code>).
+  Copy the configuration below into <code>home/config.yaml</code> on your home machine, or
+  use the download link. Double-check <code>private_key_path</code> before starting the
+  Home Console.
+</p>
+
+<textarea readonly rows="20" cols="80">{{ config_yaml }}</textarea>
+<p>
+  <a download="config.yaml" href="data:text/yaml;charset=utf-8,{{ config_yaml|urlencode }}">Download config.yaml</a>
+</p>
+
+<p><a href="{% url 'dashboard' %}">Continue to dashboard</a></p>
+{% endblock %}

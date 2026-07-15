@@ -1,0 +1,21 @@
+{% extends "web/base.html" %}
+
+{% block title %}Rotate token — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Rotate API token</h1>
+<p>
+  This issues a new API token for home <strong>{{ home.home_index }}</strong>
+  and invalidates the current one immediately.
+</p>
+<p>
+  Any Home Console currently running with the old token will start failing to reach the
+  cloud server until you update its <code>config.yaml</code> with the new token shown on
+  the next page.
+</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit">Confirm rotate</button>
+  <a href="{% url 'dashboard' %}">Cancel</a>
+</form>
+{% endblock %}

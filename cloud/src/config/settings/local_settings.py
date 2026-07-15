@@ -149,6 +149,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Cloud-at-home settings
 
 CAH_PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'
+CAH_SSH_PORT = 8022
 
 HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'

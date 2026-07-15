@@ -60,7 +60,7 @@ def load_config(path=None) -> CloudConfig:
         config_dir = resolved.parent
 
         def resolve(p):
-            path = Path(p)
+            path = Path(p).expanduser()
             return path if path.is_absolute() else (config_dir / path).resolve()
 
         db_path = resolve(data.get('database') or 'db.sqlite3')
@@ -74,11 +74,22 @@ def load_config(path=None) -> CloudConfig:
         )
 
         tcp_ports = cl.get('tcp_ports') or {}
+        ssh_data = dict(cl['ssh'])
+
+        # Present-but-blank required fields (e.g. an unfilled dashboard download)
+        # must fail the same way an absent field does, not silently proceed.
+        if not cl.get('auth_token'):
+            raise KeyError('auth_token')
+        if not ssh_data.get('private_key_path'):
+            raise KeyError('private_key_path')
+
+        ssh_data['private_key_path'] = str(resolve(ssh_data['private_key_path']))
+
         return CloudConfig(
             cloudserver_url=cl['cloudserver_url'],
             auth_token=cl['auth_token'],
             home_slug=cl['home_slug'],
-            ssh=SSHConfig(**cl['ssh']),
+            ssh=SSHConfig(**ssh_data),
             port_base=cl['ports']['base'],
             port_count=cl['ports']['count'],
             tcp_port_base=tcp_ports.get('base'),

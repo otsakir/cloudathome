@@ -1,0 +1,16 @@
+{% extends "web/base.html" %}
+
+{% block title %}Token rotated — CloudAtHome{% endblock %}
+
+{% block content %}
+<h1>Token rotated</h1>
+<p>
+  The old token stopped working immediately. Update <code>auth_token</code> in
+  <code>home/config.yaml</code> on your home machine with the new token below before the
+  Home Console can reach the cloud server again.
+</p>
+
+<textarea readonly rows="1" cols="50">{{ token }}</textarea>
+
+<p><a href="{% url 'dashboard' %}">Back to dashboard</a></p>
+{% endblock %}
