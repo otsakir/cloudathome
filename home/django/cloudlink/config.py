@@ -39,6 +39,8 @@ class CloudConfig:
     config_dir: Path = field(default_factory=Path.cwd)
     # Absolute path to the SQLite database file, resolved at load time.
     database: Path = field(default_factory=lambda: Path('db.sqlite3'))
+    # Absolute path to this profile's certbot state dir (config/work/logs), resolved at load time.
+    certbot_dir: Path = field(default_factory=lambda: Path('certbot'))
     certbot: CertbotConfig = field(default_factory=CertbotConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
 
@@ -64,6 +66,7 @@ def load_config(path=None) -> CloudConfig:
             return path if path.is_absolute() else (config_dir / path).resolve()
 
         db_path = resolve(data.get('database') or 'db.sqlite3')
+        certbot_dir = resolve('certbot')
 
         raw_deploy = certbot_data.get('deploy_path')
         certbot_deploy = resolve(raw_deploy) if raw_deploy else None
@@ -96,6 +99,7 @@ def load_config(path=None) -> CloudConfig:
             tcp_port_count=tcp_ports.get('count'),
             config_dir=config_dir,
             database=db_path,
+            certbot_dir=certbot_dir,
             certbot=CertbotConfig(deploy_path=certbot_deploy),
             features=features,
         )

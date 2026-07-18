@@ -70,6 +70,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             port_base = tunnel_manager.get_home_port_base(home.home_index)
             context['home_port_base'] = port_base
             context['mappings'] = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.PORTS_PER_HOME)
+        else:
+            context['token'] = HomeConfigService.get_or_create_token(self.request.user).key
+            context['cloudserver_url'] = self.request.build_absolute_uri('/').rstrip('/')
         return context
 
 

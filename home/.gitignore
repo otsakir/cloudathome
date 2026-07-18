@@ -1,3 +1,4 @@
 certbot
 config.yaml
 *.sqlite3
+providers/

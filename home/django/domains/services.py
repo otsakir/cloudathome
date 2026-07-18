@@ -8,24 +8,32 @@ from pathlib import Path
 from cloudlink.config import get_config
 from cloudlink.services import CloudServerClient, CloudServerError
 
-# home/ directory
-_HOME_DIR = Path(__file__).resolve().parents[2]
-
 
 class CertbotError(Exception):
     pass
 
 
 class CertbotService:
+    """Certbot state (config/work/logs) lives under the active profile's certbot_dir
+    (get_config().certbot_dir), so concurrent profiles never share certbot's locks."""
 
-    CONFIG_DIR = _HOME_DIR / 'certbot' / 'config'
-    WORK_DIR   = _HOME_DIR / 'certbot' / 'work'
-    LOGS_DIR   = _HOME_DIR / 'certbot' / 'logs'
+    @classmethod
+    def _config_dir(cls):
+        return get_config().certbot_dir / 'config'
+
+    @classmethod
+    def _work_dir(cls):
+        return get_config().certbot_dir / 'work'
+
+    @classmethod
+    def _logs_dir(cls):
+        return get_config().certbot_dir / 'logs'
 
     @classmethod
     def obtain_certificate(cls, domain, email, home_port):
         """Run certbot standalone on home_port. The tunnel must already be open."""
-        for d in (cls.CONFIG_DIR, cls.WORK_DIR, cls.LOGS_DIR):
+        config_dir, work_dir, logs_dir = cls._config_dir(), cls._work_dir(), cls._logs_dir()
+        for d in (config_dir, work_dir, logs_dir):
             d.mkdir(parents=True, exist_ok=True)
 
         proc = subprocess.run(
@@ -37,9 +45,9 @@ class CertbotService:
                 '-m', email,
                 '-d', domain.name,
                 '--http-01-port', str(home_port),
-                '--config-dir', str(cls.CONFIG_DIR),
-                '--work-dir', str(cls.WORK_DIR),
-                '--logs-dir', str(cls.LOGS_DIR),
+                '--config-dir', str(config_dir),
+                '--work-dir', str(work_dir),
+                '--logs-dir', str(logs_dir),
             ],
             capture_output=True,
             text=True,
@@ -47,7 +55,7 @@ class CertbotService:
         if proc.returncode != 0:
             raise CertbotError(f'certbot failed (exit {proc.returncode}):\n{proc.stderr}')
 
-        cert_path = cls.CONFIG_DIR / 'live' / domain.name / 'fullchain.pem'
+        cert_path = config_dir / 'live' / domain.name / 'fullchain.pem'
         expiry = cls.check_certificate(str(cert_path))
         domain.cert_status = domain.CERT_VALID
         domain.cert_expiry = expiry
@@ -66,7 +74,7 @@ class CertbotService:
     @classmethod
     def _deploy_certificates(cls, domain_name, deploy_path):
         """Copy fullchain.pem and privkey.pem to deploy_path/<domain_name>/."""
-        src = cls.CONFIG_DIR / 'live' / domain_name
+        src = cls._config_dir() / 'live' / domain_name
         dst = deploy_path / domain_name
         dst.mkdir(parents=True, exist_ok=True)
         for filename in ('fullchain.pem', 'privkey.pem', 'chain.pem', 'cert.pem'):

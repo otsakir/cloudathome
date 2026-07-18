@@ -56,6 +56,8 @@
   {% endif %}
 
 {% else %}
-  <p>No home registered yet. <a href="{% url 'register_home' %}">Register a home</a></p>
+  <p>No home registered yet. <a href="{% url 'register_home' %}">Register a home</a> using the web form, or register directly from your home machine using your API token:</p>
+  <p>API token: <code>{{ token }}</code></p>
+  <pre><code>python scripts/register_home.py --cloudserver-url {{ cloudserver_url }} --token {{ token }}</code></pre>
 {% endif %}
 {% endblock %}

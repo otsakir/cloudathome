@@ -1,4 +1,5 @@
 import sys
+from django.conf import settings
 from rest_framework import serializers
 from tunnels.models import Home
 from tunnels.ssh.manage_home import tunnel_manager
@@ -61,6 +62,7 @@ class BaseDomainResponseSerializer(serializers.Serializer):
 class OutHomeSerializer(serializers.ModelSerializer):
 
     ssh_username = serializers.SerializerMethodField()
+    ssh_port = serializers.SerializerMethodField()
     port_base = serializers.SerializerMethodField()
     port_count = serializers.SerializerMethodField()
     tcp_port_base = serializers.SerializerMethodField()
@@ -69,6 +71,9 @@ class OutHomeSerializer(serializers.ModelSerializer):
 
     def get_ssh_username(self, obj: Home) -> str:
         return tunnel_manager.make_username(home_index=obj.home_index, suffix=obj.user.username)
+
+    def get_ssh_port(self, obj: Home) -> int:
+        return settings.CAH_SSH_PORT
 
     def get_port_base(self, obj: Home) -> int:
         return tunnel_manager.get_home_port_base(home_id=obj.home_index)
@@ -87,4 +92,4 @@ class OutHomeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Home
-        fields = ['slug', 'ssh_username', 'port_base', 'port_count', 'tcp_port_base', 'tcp_port_count', 'bandwidth_limit_kbps', 'base_domains']
+        fields = ['slug', 'ssh_username', 'ssh_port', 'port_base', 'port_count', 'tcp_port_base', 'tcp_port_count', 'bandwidth_limit_kbps', 'base_domains']

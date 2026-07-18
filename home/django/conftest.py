@@ -20,7 +20,7 @@ def cloudlink_config(tmp_path, monkeypatch):
         '    base: 2000\n'
         '    count: 10\n'
     )
-    monkeypatch.setenv('CLOUDATHOME_CONFIG', str(config))
+    monkeypatch.setenv('HOME_CONFIG', str(config))
     # reset the cached singleton so each test gets a fresh load
     import cloudlink.config as cfg_module
     monkeypatch.setattr(cfg_module, '_config', None)
