@@ -4,7 +4,6 @@ from django.urls import path
 from web.views import (
     LandingView, SignupView, SignupPendingView, LoginView, DashboardView,
     RegisterHomeView, EditHomeView, ReleaseHomeView, RotateTokenView, ClientConfigView,
-    AddMappingView, DeleteMappingView,
 )
 
 urlpatterns = [
@@ -19,6 +18,4 @@ urlpatterns = [
     path('home/release/', ReleaseHomeView.as_view(), name='release_home'),
     path('home/token/rotate/', RotateTokenView.as_view(), name='rotate_token'),
     path('home/config/', ClientConfigView.as_view(), name='client_config'),
-    path('home/mappings/add/', AddMappingView.as_view(), name='add_mapping'),
-    path('home/mappings/<str:host>/delete/', DeleteMappingView.as_view(), name='delete_mapping'),
 ]

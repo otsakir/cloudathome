@@ -3,8 +3,7 @@ import re
 from django import forms
 from django.contrib.auth.models import User
 
-from tunnels.services import HAProxyService
-from tunnels.ssh.manage_home import Config, tunnel_manager
+from tunnels.ssh.manage_home import Config
 
 _USERNAME_PATTERN = re.compile(f'^{Config.USERNAME_SUFFIX_PATTERN}$')
 
@@ -51,36 +50,3 @@ class RegisterHomeForm(UpdatePublicKeyForm):
             'Only used to pre-fill the generated config.yaml below — not stored on the server.'
         ),
     )
-
-
-_SCHEME_CHOICES = [('http', 'HTTP'), ('https', 'HTTPS')]
-
-
-class AddMappingForm(forms.Form):
-    host = forms.CharField(max_length=253, label='Hostname')
-    tunnel_port = forms.IntegerField(label='Tunnel port')
-    scheme = forms.ChoiceField(choices=_SCHEME_CHOICES, label='Scheme')
-
-    def __init__(self, *args, home=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.home = home
-
-    def clean_host(self):
-        host = self.cleaned_data['host']
-        used_hosts = {e['host'] for e in HAProxyService.dump_mappings()}
-        if host in used_hosts:
-            raise forms.ValidationError('A mapping for this hostname already exists.')
-        return host
-
-    def clean_tunnel_port(self):
-        port = self.cleaned_data['tunnel_port']
-        if self.home:
-            port_base = tunnel_manager.get_home_port_base(self.home.home_index)
-            port_max = port_base + tunnel_manager.config.PORTS_PER_HOME - 1
-            if not (port_base <= port <= port_max):
-                raise forms.ValidationError(
-                    f'Port must be between {port_base} and {port_max} for your home slot.'
-                )
-            if port in HAProxyService.get_used_ports():
-                raise forms.ValidationError('That tunnel port is already in use.')
-        return port

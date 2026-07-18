@@ -15,8 +15,6 @@
     <tr><th>Port count</th><td>10</td></tr>
   </table>
   <p>
-    <a href="{% url 'add_mapping' %}">Add proxy mapping</a>
-    &nbsp;|&nbsp;
     <a href="{% url 'edit_home' %}">Update public key</a>
     &nbsp;|&nbsp;
     <a href="{% url 'rotate_token' %}">Rotate API token</a>
@@ -27,10 +25,11 @@
   </p>
 
   <h2>Proxy mappings</h2>
+  <p>Manage mappings from your Home Console — this is a read-only view of what's currently live.</p>
   {% if mappings %}
     <table>
       <thead>
-        <tr><th>Hostname</th><th>Tunnel port</th><th>Scheme</th><th>SSH command (run on home machine)</th><th></th></tr>
+        <tr><th>Hostname</th><th>Tunnel port</th><th>Scheme</th></tr>
       </thead>
       <tbody>
         {% for mapping in mappings %}
@@ -38,15 +37,6 @@
             <td>{{ mapping.host }}</td>
             <td>{{ mapping.tunnel_port }}</td>
             <td>{{ mapping.scheme }}</td>
-            <td>
-              <code>ssh -N -R {{ mapping.tunnel_port }}:localhost:{% if mapping.scheme == 'https' %}443{% else %}80{% endif %} {{ home.get_username }}@{{ ssh_host }} -p 22</code>
-            </td>
-            <td>
-              <form method="post" action="{% url 'delete_mapping' mapping.host %}">
-                {% csrf_token %}
-                <button type="submit">Delete</button>
-              </form>
-            </td>
           </tr>
         {% endfor %}
       </tbody>

@@ -12,7 +12,7 @@ from django.views.generic import FormView, TemplateView, View
 from tunnels.models import Home
 from tunnels.services import ElevatedOperations, HAProxyService
 from tunnels.ssh.manage_home import tunnel_manager
-from web.forms import SignupForm, RegisterHomeForm, UpdatePublicKeyForm, AddMappingForm
+from web.forms import SignupForm, RegisterHomeForm, UpdatePublicKeyForm
 from web.services import HomeConfigService
 
 
@@ -201,48 +201,3 @@ class RotateTokenView(HomeOwnerMixin, TemplateView):
         })
 
 
-class AddMappingView(HomeOwnerMixin, FormView):
-    template_name = 'web/add_mapping.html'
-    form_class = AddMappingForm
-
-    def get_home(self):
-        return get_object_or_404(Home, user=self.request.user)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['home'] = self.get_home()
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        home = self.get_home()
-        context['home'] = home
-        port_base = tunnel_manager.get_home_port_base(home.home_index)
-        context['home_port_base'] = port_base
-        context['home_port_max'] = port_base + tunnel_manager.config.PORTS_PER_HOME - 1
-        return context
-
-    def form_valid(self, form):
-        host = form.cleaned_data['host']
-        tunnel_port = form.cleaned_data['tunnel_port']
-        scheme = form.cleaned_data['scheme']
-        try:
-            HAProxyService.add_mapping(host, tunnel_port, scheme)
-        except Exception:
-            messages.error(self.request, 'Failed to configure proxy.')
-            return redirect('dashboard')
-
-        messages.success(self.request, f'Proxy mapping for {host} added.')
-        return redirect('dashboard')
-
-
-class DeleteMappingView(HomeOwnerMixin, View):
-    def post(self, request, host, *args, **kwargs):
-        try:
-            HAProxyService.remove_mapping(host)
-        except Exception:
-            messages.error(request, 'Failed to remove proxy mapping.')
-            return redirect('dashboard')
-
-        messages.success(request, f'Proxy mapping for {host} deleted.')
-        return redirect('dashboard')
