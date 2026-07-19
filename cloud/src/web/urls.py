@@ -3,7 +3,7 @@ from django.urls import path
 
 from web.views import (
     LandingView, SignupView, SignupPendingView, LoginView, DashboardView,
-    RegisterHomeView, EditHomeView, ReleaseHomeView, RotateTokenView, ClientConfigView,
+    EditHomeView, ReleaseHomeView, RotateTokenView, ClientConfigView,
 )
 
 urlpatterns = [
@@ -13,7 +13,6 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
-    path('home/register/', RegisterHomeView.as_view(), name='register_home'),
     path('home/edit/', EditHomeView.as_view(), name='edit_home'),
     path('home/release/', ReleaseHomeView.as_view(), name='release_home'),
     path('home/token/rotate/', RotateTokenView.as_view(), name='rotate_token'),

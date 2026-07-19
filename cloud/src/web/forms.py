@@ -40,13 +40,3 @@ class UpdatePublicKeyForm(forms.Form):
     )
 
 
-class RegisterHomeForm(UpdatePublicKeyForm):
-    private_key_path = forms.CharField(
-        required=False,
-        max_length=500,
-        label='Local private key path',
-        help_text=(
-            'Path to the matching private key on your home machine (from generate_keys.py). '
-            'Only used to pre-fill the generated config.yaml below — not stored on the server.'
-        ),
-    )

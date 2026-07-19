@@ -1,14 +1,21 @@
 {% extends "web/base.html" %}
 
-{% block title %}Token rotated — CloudAtHome{% endblock %}
+{% block title %}Token {% if home %}rotated{% else %}generated{% endif %} — CloudAtHome{% endblock %}
 
 {% block content %}
-<h1>Token rotated</h1>
-<p>
-  The old token stopped working immediately. Update <code>auth_token</code> in
-  <code>home/config.yaml</code> on your home machine with the new token below before the
-  Home Console can reach the cloud server again.
-</p>
+<h1>Token {% if home %}rotated{% else %}generated{% endif %}</h1>
+{% if home %}
+  <p>
+    The old token stopped working immediately. Update <code>auth_token</code> in
+    <code>home/config.yaml</code> on your home machine with the new token below before the
+    Home Console can reach the cloud server again.
+  </p>
+{% else %}
+  <p>
+    Copy this token now — it won't be shown again. Use it to
+    register a home from your home machine.
+  </p>
+{% endif %}
 
 <textarea readonly rows="1" cols="50">{{ token }}</textarea>
 

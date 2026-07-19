@@ -70,6 +70,21 @@ def _suggest_profile_name(providers_dir, ssh_host):
     return f'{base}-{n}'
 
 
+def _run_migrations(config_path):
+    """Best-effort: initialize the new profile's database schema. A failure here
+    doesn't fail registration -- the cloud-side registration already succeeded
+    and config.yaml is already valid; the user can just run migrate themselves."""
+    manage_py = _HOME_DIR / 'django' / 'manage.py'
+    env = dict(os.environ, HOME_CONFIG=str(config_path))
+    result = subprocess.run(
+        [sys.executable, str(manage_py), 'migrate'],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0, result.stderr
+
+
 def _generate_keypair(private_key_path):
     """Generate a fresh ed25519 keypair at private_key_path. Returns the public key content."""
     result = subprocess.run(
@@ -192,8 +207,18 @@ def main():
     print(f'  ssh_username : {home["ssh_username"]}')
     print(f'  ssh_host     : {ssh_host}:{home["ssh_port"]}')
     print(f'  port range   : {home["port_base"]} – {home["port_base"] + home["port_count"] - 1}')
-    print(f'\nStart this profile with:')
-    print(f'  HOME_CONFIG={output_path} python manage.py runserver 0.0.0.0:<port>')
+
+    print('\nInitializing profile database...')
+    migrated, migrate_error = _run_migrations(output_path)
+
+    if migrated:
+        print('\nStart this profile with:')
+        print(f'  HOME_CONFIG={output_path} python manage.py runserver 0.0.0.0:<port>')
+    else:
+        print(f'Warning: automatic migration failed:\n{migrate_error}', file=sys.stderr)
+        print('\nRegistration succeeded, but you need to run migrations yourself before starting:')
+        print(f'  HOME_CONFIG={output_path} python manage.py migrate')
+        print(f'  HOME_CONFIG={output_path} python manage.py runserver 0.0.0.0:<port>')
 
 
 if __name__ == '__main__':

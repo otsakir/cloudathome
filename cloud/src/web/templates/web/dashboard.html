@@ -46,8 +46,19 @@
   {% endif %}
 
 {% else %}
-  <p>No home registered yet. <a href="{% url 'register_home' %}">Register a home</a> using the web form, or register directly from your home machine using your API token:</p>
-  <p>API token: <code>{{ token }}</code></p>
-  <pre><code>python scripts/register_home.py --cloudserver-url {{ cloudserver_url }} --token {{ token }}</code></pre>
+  <p>No home registered yet. Register one directly from your home machine:</p>
+  {% if has_token %}
+    <p>You already have an API token. It's only shown once, at generation time — if you don't have it saved, <a href="{% url 'rotate_token' %}">regenerate it</a> and substitute the new value below.</p>
+  {% else %}
+    <p><a href="{% url 'rotate_token' %}">Generate an API token</a> first, then substitute it below.</p>
+  {% endif %}
+  <pre><code>python scripts/register_home.py --cloudserver-url {{ cloudserver_url }} --token &lt;your-token&gt; [--name myhome]</code></pre>
+  <p>
+    This authenticates with the token (not your account password), generates a dedicated
+    SSH keypair for this registration, and writes <code>config.yaml</code> into
+    <code>home/providers/&lt;name&gt;/</code> on your home machine. Then run:
+  </p>
+  <pre><code>HOME_CONFIG=home/providers/&lt;name&gt;/config.yaml python manage.py migrate
+HOME_CONFIG=home/providers/&lt;name&gt;/config.yaml python manage.py runserver 0.0.0.0:&lt;port&gt;</code></pre>
 {% endif %}
 {% endblock %}

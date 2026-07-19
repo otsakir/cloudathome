@@ -1,18 +1,15 @@
-import secrets
-
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.views import LoginView as AuthLoginView
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
 from django.shortcuts import redirect, render, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
 from tunnels.models import Home
 from tunnels.services import ElevatedOperations, HAProxyService
 from tunnels.ssh.manage_home import tunnel_manager
-from web.forms import SignupForm, RegisterHomeForm, UpdatePublicKeyForm
+from web.forms import SignupForm, UpdatePublicKeyForm
 from web.services import HomeConfigService
 
 
@@ -71,50 +68,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             context['home_port_base'] = port_base
             context['mappings'] = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.PORTS_PER_HOME)
         else:
-            context['token'] = HomeConfigService.get_or_create_token(self.request.user).key
+            context['has_token'] = HomeConfigService.has_token(self.request.user)
             context['cloudserver_url'] = self.request.build_absolute_uri('/').rstrip('/')
         return context
-
-
-class RegisterHomeView(HomeOwnerMixin, FormView):
-    template_name = 'web/register_home.html'
-    form_class = RegisterHomeForm
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and Home.objects.filter(user=request.user).exists():
-            return redirect('dashboard')
-        return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        with transaction.atomic():
-            available_home = Home.objects.select_for_update().filter(user__isnull=True).first()
-            if not available_home:
-                messages.error(self.request, 'No home slots are currently available.')
-                return redirect('dashboard')
-
-            try:
-                ElevatedOperations.add_home_user(
-                    available_home.home_index,
-                    self.request.user.username,
-                    form.cleaned_data['public_key'],
-                )
-            except Exception:
-                messages.error(self.request, 'Failed to create tunnel user.')
-                return redirect('dashboard')
-
-            available_home.user = self.request.user
-            available_home.public_key = form.cleaned_data['public_key']
-            available_home.slug = secrets.token_urlsafe(16)
-            available_home.save()
-
-        token = HomeConfigService.get_or_create_token(self.request.user)
-        config_yaml = HomeConfigService.build_yaml(
-            self.request, available_home, token.key, form.cleaned_data.get('private_key_path'),
-        )
-        return render(self.request, 'web/home_config.html', {
-            'home': available_home,
-            'config_yaml': config_yaml,
-        })
 
 
 class EditHomeView(HomeOwnerMixin, FormView):
@@ -177,27 +133,30 @@ class ClientConfigView(HomeOwnerMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         home = get_object_or_404(Home, user=self.request.user)
-        token = HomeConfigService.get_or_create_token(self.request.user)
         context['home'] = home
-        context['config_yaml'] = HomeConfigService.build_yaml(self.request, home, token.key, redact=True)
+        context['config_yaml'] = HomeConfigService.build_yaml(self.request, home)
         return context
 
 
 class RotateTokenView(HomeOwnerMixin, TemplateView):
+    """Generates a fresh API token, whether or not a home is registered yet.
+    rotate_token() deletes any existing token first, so this is also how a
+    user gets their very first token -- there's no separate "generate" flow."""
     template_name = 'web/rotate_token.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['home'] = get_object_or_404(Home, user=self.request.user)
+        context['home'] = Home.objects.filter(user=self.request.user).first()
         return context
 
     def post(self, request, *args, **kwargs):
-        home = get_object_or_404(Home, user=request.user)
+        home = Home.objects.filter(user=request.user).first()
         token = HomeConfigService.rotate_token(request.user)
         messages.success(request, 'Token rotated. The old token no longer works.')
         return render(request, 'web/token_rotated.html', {
             'home': home,
             'token': token.key,
+            'cloudserver_url': request.build_absolute_uri('/').rstrip('/'),
         })
 
 
