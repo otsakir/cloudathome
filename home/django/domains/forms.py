@@ -10,6 +10,27 @@ class AddDomainForm(forms.Form):
         help_text='e.g. mysite.example.com',
     )
 
+    def __init__(self, *args, base_domains=None, **kwargs):
+        """base_domains: list of registered base domains, or None if they
+        couldn't be fetched (in which case validation is skipped -- the
+        cloud will still enforce this when a proxy mapping is created)."""
+        super().__init__(*args, **kwargs)
+        self.base_domains = base_domains
+
+    def clean_name(self):
+        name = self.cleaned_data['name'].strip().lower()
+        if self.base_domains is not None:
+            if not self.base_domains:
+                raise forms.ValidationError(
+                    'You have no registered base domains yet. Register one from the dashboard first.'
+                )
+            if not any(name == bd or name.endswith('.' + bd) for bd in self.base_domains):
+                raise forms.ValidationError(
+                    f"'{name}' must be equal to or a subdomain of one of your registered base "
+                    f"domains: {', '.join(self.base_domains)}"
+                )
+        return name
+
 
 class ProxyEntryForm(forms.Form):
     scheme = forms.ChoiceField(

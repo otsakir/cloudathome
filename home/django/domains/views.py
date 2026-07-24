@@ -38,6 +38,25 @@ class AddDomainView(FormView):
     template_name = 'domains/add_domain.html'
     form_class = AddDomainForm
 
+    def get_base_domains(self):
+        """None means "couldn't check" (fail open); [] means "checked, none registered"."""
+        if not hasattr(self, '_base_domains'):
+            try:
+                self._base_domains = [d['domain'] for d in CloudServerClient().list_base_domains()]
+            except Exception:
+                self._base_domains = None
+        return self._base_domains
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['base_domains'] = self.get_base_domains()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['base_domains'] = self.get_base_domains()
+        return context
+
     def form_valid(self, form):
         domain, _ = Domain.objects.get_or_create(name=form.cleaned_data['name'])
         return redirect('domain_detail', pk=domain.pk)

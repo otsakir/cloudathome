@@ -5,6 +5,14 @@
 <h1>Add domain</h1>
 <p><a href="{% url 'domain_list' %}">Back to domains</a> | <a href="{% url 'dashboard' %}">Dashboard</a></p>
 
+{% if base_domains == None %}
+  <p><em>Could not verify your registered base domains right now — this will still be checked when you add a proxy mapping.</em></p>
+{% elif not base_domains %}
+  <p><strong>You have no registered base domains yet.</strong> <a href="{% url 'dashboard' %}">Register one</a> before adding a domain.</p>
+{% else %}
+  <p>Must be equal to or a subdomain of one of your base domains: {{ base_domains|join:", " }}</p>
+{% endif %}
+
 {% if form.non_field_errors %}
   <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
 {% endif %}
