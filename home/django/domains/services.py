@@ -161,7 +161,7 @@ class SyncService:
                 client.delete_proxy_mapping('tcp', public_port=entry.public_port)
             else:
                 client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
-        except Exception:
+        except CloudServerError:
             pass
 
         try:
@@ -214,7 +214,7 @@ class SyncService:
                 client.delete_proxy_mapping('tcp', public_port=entry.public_port)
             else:
                 client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
-        except Exception:
+        except CloudServerError:
             pass
         entry.tunnel_pid = None
         entry.tunnel_status = ProxyEntry.TUNNEL_CLOSED

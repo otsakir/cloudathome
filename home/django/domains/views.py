@@ -19,7 +19,7 @@ def _delete_proxy_entry(entry):
             client.delete_proxy_mapping('tcp', public_port=entry.public_port)
         else:
             client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
-    except Exception:
+    except CloudServerError:
         pass
     entry.delete()
 

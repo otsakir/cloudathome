@@ -30,7 +30,7 @@ class DashboardView(TemplateView):
                     TunnelService.is_home_port_open(entry.home_host, entry.home_port)
                     if entry.tunnel_status == ProxyEntry.TUNNEL_OPEN else None
                 )
-            except Exception:
+            except ProxyEntry.DoesNotExist:
                 pass
         context['domains'] = domains
 
