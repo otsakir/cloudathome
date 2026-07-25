@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from tunnels.models import HomeBaseDomain
-from tunnels.services import ElevatedOperations, HAProxyService, BaseDomainService
+from tunnels.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home
 from tunnels.ssh.manage_home import tunnel_manager
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -98,36 +98,12 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
 
     def destroy(self, request, *args, **kwargs):
-        from django.db import transaction
-
         home = self.get_object()
 
-        port_base = tunnel_manager.get_home_port_base(home.home_index)
-        tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
-        mappings = HAProxyService.get_home_mappings(
-            port_base,
-            tunnel_manager.config.PORTS_PER_HOME,
-            tcp_public_port_base=tcp_port_base,
-            tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
-        )
-        for m in mappings:
-            if m['scheme'] == 'tcp':
-                HAProxyService.remove_tcp_mapping(m['public_port'])
-            else:
-                HAProxyService.remove_http_mapping(m['scheme'], m['host'])
-
         try:
-            ElevatedOperations.remove_home_user(home.home_index, home.user.username)
+            release_home(home)
         except subprocess.CalledProcessError:
             return Response({'message': 'failed to remove tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        with transaction.atomic():
-            home.base_domains.all().delete()
-            home.public_key = None
-            home.user = None
-            home.slug = None
-            home.bandwidth_limit_kbps = None
-            home.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

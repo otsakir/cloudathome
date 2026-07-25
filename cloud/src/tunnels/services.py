@@ -224,3 +224,43 @@ class ElevatedOperations:
             ['sudo', 'manage_home.py', 'bandwidth', 'unset', str(home_id)],
             check=True,
         )
+
+
+def release_home(home):
+    """Fully release a home slot: tear down its live HAProxy mappings, remove the
+    system tunnel user, and clear all per-slot state (base domains, bandwidth
+    limit) so none of it carries over to whoever claims this slot next.
+
+    Shared by the API's DELETE /api/homes/<slug>/ and the web UI's "Release home"
+    button -- previously duplicated, which is how the web path silently missed
+    this cleanup after the API path was fixed.
+
+    Raises subprocess.CalledProcessError if removing the system user fails;
+    callers should catch that specifically to report a clean error.
+    """
+    from django.db import transaction
+    from tunnels.ssh.manage_home import tunnel_manager
+
+    port_base = tunnel_manager.get_home_port_base(home.home_index)
+    tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
+    mappings = HAProxyService.get_home_mappings(
+        port_base,
+        tunnel_manager.config.PORTS_PER_HOME,
+        tcp_public_port_base=tcp_port_base,
+        tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
+    )
+    for m in mappings:
+        if m['scheme'] == 'tcp':
+            HAProxyService.remove_tcp_mapping(m['public_port'])
+        else:
+            HAProxyService.remove_http_mapping(m['scheme'], m['host'])
+
+    ElevatedOperations.remove_home_user(home.home_index, home.user.username)
+
+    with transaction.atomic():
+        home.base_domains.all().delete()
+        home.public_key = None
+        home.user = None
+        home.slug = None
+        home.bandwidth_limit_kbps = None
+        home.save()

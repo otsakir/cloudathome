@@ -9,7 +9,7 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
 from tunnels.models import Home
-from tunnels.services import ElevatedOperations, HAProxyService
+from tunnels.services import ElevatedOperations, HAProxyService, release_home
 from tunnels.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, UpdatePublicKeyForm
 from web.services import HomeConfigService
@@ -115,15 +115,10 @@ class ReleaseHomeView(HomeOwnerMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         home = get_object_or_404(Home, user=request.user)
         try:
-            ElevatedOperations.remove_home_user(home.home_index, home.user.username)
+            release_home(home)
         except subprocess.CalledProcessError:
             messages.error(request, 'Failed to remove tunnel user.')
             return redirect('dashboard')
-
-        home.user = None
-        home.public_key = None
-        home.slug = None
-        home.save()
 
         messages.success(request, 'Home released.')
         return redirect('dashboard')
