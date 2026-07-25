@@ -1,0 +1,8 @@
+# Optional global settings shared across all provider profiles (home/providers/*/).
+# Copy to home/home.yaml to override; if home/home.yaml doesn't exist, cah.py falls
+# back to its hardcoded default cloud server URL.
+
+default_cloudserver_url: http://cloudathome.retalia.org
+
+# Base port for auto-assigned Home Console ports (see `cah.py start`).
+# home_console_port_base: 8001

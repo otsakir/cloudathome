@@ -53,7 +53,7 @@ def load_config(path=None) -> CloudConfig:
     except FileNotFoundError:
         raise FileNotFoundError(
             f'CloudAtHome config not found at {resolved}. '
-            'Run scripts/register_home.py to create it, or set the '
+            'Run cah.py register to create it, or set the '
             'HOME_CONFIG environment variable to the correct path.'
         )
     try:

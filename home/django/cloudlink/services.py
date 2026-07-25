@@ -85,3 +85,21 @@ class CloudServerClient:
         if resp.status_code != 200:
             raise CloudServerError(f'update_bandwidth failed: {resp.status_code} {resp.text}')
         return resp.json()
+
+    def delete_home(self):
+        """Release this home's slot. The cloud also cleans up its base domains, live
+        mappings, and bandwidth limit -- see HomeRetrieveDestroyApiView.destroy().
+        A 404 means it was already released by a prior partial run; treat as success."""
+        resp = requests.delete(
+            self._url(f'/api/homes/{get_config().home_slug}/'),
+            headers=self._headers(),
+        )
+        if resp.status_code == 404:
+            return
+        if resp.status_code != 204:
+            raise CloudServerError(f'delete_home failed: {resp.status_code} {resp.text}')
+
+    def revoke_token(self):
+        resp = requests.delete(self._url('/api/auth/token/'), headers=self._headers())
+        if resp.status_code != 204:
+            raise CloudServerError(f'revoke_token failed: {resp.status_code} {resp.text}')

@@ -52,13 +52,12 @@
   {% else %}
     <p><a href="{% url 'rotate_token' %}">Generate an API token</a> first, then substitute it below.</p>
   {% endif %}
-  <pre><code>python scripts/register_home.py --cloudserver-url {{ cloudserver_url }} --token &lt;your-token&gt; [--name myhome]</code></pre>
+  <pre><code>python cah.py register --cloudserver-url {{ cloudserver_url }} --token &lt;your-token&gt; [--name myhome]</code></pre>
   <p>
     This authenticates with the token (not your account password), generates a dedicated
     SSH keypair for this registration, and writes <code>config.yaml</code> into
     <code>home/providers/&lt;name&gt;/</code> on your home machine. Then run:
   </p>
-  <pre><code>HOME_CONFIG=home/providers/&lt;name&gt;/config.yaml python manage.py migrate
-HOME_CONFIG=home/providers/&lt;name&gt;/config.yaml python manage.py runserver 0.0.0.0:&lt;port&gt;</code></pre>
+  <pre><code>python cah.py start --name &lt;name&gt;</code></pre>
 {% endif %}
 {% endblock %}

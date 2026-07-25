@@ -4,12 +4,13 @@ from .views import (
     ProxyMappingListView, SchemeProxyMappingCreateView, TcpProxyMappingCreateView,
     SchemeProxyMappingDestroyAPIView, TcpProxyMappingDestroyAPIView, ProxyInstanceAPIView,
     HomeRetrieveDestroyApiView, HomeListCreateAPIView, ProxyMappingDumpView, HomeSyncView,
-    BaseDomainListCreateView, BaseDomainDestroyView,
+    BaseDomainListCreateView, BaseDomainDestroyView, RevokeTokenView,
 )
 
 
 urlpatterns = [
     path('api/auth/authtoken/', obtain_auth_token, name='api-token-auth'),
+    path('api/auth/token/', RevokeTokenView.as_view(), name='revoke-token'),
 
     path('api/homes/', HomeListCreateAPIView.as_view(), name='create-list-home'),
     path('api/homes/<slug:slug>/', HomeRetrieveDestroyApiView.as_view(), name='retrieve-delete-home'),

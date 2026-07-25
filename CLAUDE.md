@@ -152,7 +152,7 @@ cloud/
 | GET | `/api/homes/` | List caller's assigned homes (auth required) |
 | POST | `/api/homes/` | Claim a home slot and install SSH key |
 | PATCH | `/api/homes/<slug>/` | Rotate SSH public key and/or set/clear bandwidth limit |
-| DELETE | `/api/homes/<slug>/` | Release a home slot |
+| DELETE | `/api/homes/<slug>/` | Release a home slot (also cascades: removes this home's live HAProxy mappings and registered base domains, and clears its bandwidth limit, so none of it carries over to whoever claims the slot next) |
 | GET | `/api/homes/<slug>/base-domains/` | List base domains registered for this home |
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (must have no active mappings under it) |
@@ -161,13 +161,15 @@ cloud/
 | DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy |
 | POST | `/api/homes/<slug>/proxy-mappings/tcp/` | Allocate a tunnel port and register a raw TCP mapping (public port must be in this home's TCP port range) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/tcp/<port>/` | Remove a TCP forwarding rule from HAProxy |
+| POST | `/api/auth/authtoken/` | Obtain a token (username/password) |
+| DELETE | `/api/auth/token/` | Revoke the caller's own token |
 | GET | `/api/admin/proxy-mappings/haproxy` | Dump current live HAProxy map entries (admin only) |
 | POST | `/api/admin/homes/sync` | Reconcile DB homes with system users (admin only) |
 
-Authentication is session-based (web UI) or token-based (`TokenAuthentication`, for the home-side agent). All endpoints require a logged-in user. Proxy mappings and base domains are scoped to the caller's own home slot.
+Authentication is session-based (web UI) or token-based (`TokenAuthentication`, for the home-side `cah.py` CLI). All endpoints require a logged-in user. Proxy mappings and base domains are scoped to the caller's own home slot.
 
 ### Web UI
 
-Session-authenticated MVC views in `web/` (`web/views.py`, `web/forms.py`, `web/urls.py`) let a signed-up user register a home, view their dashboard (tunnel/proxy mapping status, generated `home/config.yaml`), rotate their API token, edit their SSH key, and release their home slot. `web/services.py`'s `HomeConfigService` renders the YAML config the home-side agent needs (cloud URL, auth token, SSH connection details, port ranges) and manages that user's DRF token lifecycle.
+Session-authenticated MVC views in `web/` (`web/views.py`, `web/forms.py`, `web/urls.py`) let a signed-up user view their dashboard (tunnel/proxy mapping status), generate/rotate their API token (`RotateTokenView` — this is also how a user gets their first token; there's no separate web-form "register a home" flow, that goes through `POST /api/homes/` via the home-side `cah.py register`), edit their SSH key, and release their home slot. `web/services.py`'s `HomeConfigService` renders the YAML config the home-side CLI needs (cloud URL, auth token, SSH connection details, port ranges) and manages that user's DRF token lifecycle.
 
 Note: `AddMappingView`/`DeleteMappingView` in `web/views.py` call `HAProxyService.add_mapping(host, tunnel_port, scheme)` and `HAProxyService.remove_mapping(host)`, but `HAProxyService` (in `tunnels/services.py`) now expects `add_mapping(scheme, tunnel_port, host=None, public_port=None)` and has no `remove_mapping` method (only `remove_http_mapping`/`remove_tcp_mapping`). These two views are currently broken/stale relative to the service layer — worth fixing or removing before relying on the manual "add mapping" web form.

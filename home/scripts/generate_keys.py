@@ -5,10 +5,11 @@ Generate a dedicated SSH ed25519 key pair for CloudAtHome tunnel use.
 Usage:
     python generate_keys.py [--output PATH] [--force]
 
-The public key is printed to stdout so it can be passed directly to
-register_home.py:
+`cah.py register` generates its own dedicated keypair per profile by default, so this
+script is only needed if you want to bring your own key instead. The public key is
+printed to stdout so it can be passed directly to `cah.py register`:
 
-    python generate_keys.py | python register_home.py --public-key /dev/stdin ...
+    python generate_keys.py | python cah.py register --public-key /dev/stdin --private-key <path> ...
 """
 import argparse
 import subprocess

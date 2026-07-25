@@ -17,12 +17,12 @@ A system that allows running application servers at home and making them reachab
 | **HAProxy** | Cloud server | HTTPS ingress on port 443 (SNI-based routing) and TCP forwarding on ports 10000–10099 (port-based routing). Routes traffic to per-home SSH tunnel ports via runtime-updated map files. |
 | **Django + sshd** | Cloud server | REST API and web UI for managing homes and proxy mappings. SSH server that accepts reverse tunnels from home networks. |
 | **Home Console** | Home network | Django app that manages HTTP/HTTPS forwards (domain + TLS certificate lifecycle), TCP forwards, and SSH reverse tunnels. Reads connection config from a local YAML file. |
-| **Setup scripts** | Home network | Standalone scripts that generate an SSH key pair and register the home with the cloud server. Run once before starting the Home Console. |
+| **`cah.py`** | Home network | Single CLI for the home side: register with a cloud server, start the Home Console for a profile, list registered profiles, and deregister/remove one. Run once (`register`) before starting the Home Console. |
 
 ### How it works
 
-1. A home operator runs the setup scripts to generate an SSH key pair and register their home with the cloud server. The cloud server creates a dedicated system user and tunnel endpoint; the scripts write the resulting connection details to `home/config.yaml`.
-2. The Home Console Django app is started. It reads `config.yaml` and is ready for use.
+1. A home operator generates an API token from the cloud dashboard, then runs `python cah.py register` with that token. It registers the home (generating a dedicated SSH key pair by default), and writes the resulting connection details to a per-profile `home/providers/<name>/config.yaml`.
+2. `python cah.py start --name <name>` starts the Home Console Django app for that profile. A single home client can hold several such profiles side by side — one per cloud server — each run as its own process, started independently.
 3. For HTTP/HTTPS forwards, the operator first registers one or more **base domains** with the cloud server (e.g. `mysite.example.com`). The cloud enforces that no two homes can claim overlapping domains. The home is then authoritative for that domain and all its subdomains.
 4. The operator adds forwards in the Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally. HTTP/HTTPS forwards are only accepted if the hostname falls under one of the home's registered base domains.
 5. For HTTP/HTTPS forwards: the operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
@@ -90,13 +90,20 @@ The API is browsable via Swagger UI when running in debug mode:
 | POST | `/api/homes/` | Claim a home slot and install SSH key |
 | GET | `/api/homes/<slug>/` | Retrieve home details (port ranges, base domains, bandwidth limit) |
 | PATCH | `/api/homes/<slug>/` | Update SSH public key or bandwidth limit |
-| DELETE | `/api/homes/<slug>/` | Release a home slot |
+| DELETE | `/api/homes/<slug>/` | Release a home slot (also removes its live HAProxy mappings, registered base domains, and bandwidth limit, so none of it carries over to whoever claims the slot next) |
 | GET | `/api/homes/<slug>/base-domains/` | List registered base domains |
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (blocked if active proxy mappings exist under it) |
 | GET | `/api/homes/<slug>/proxy-mappings/` | List active HAProxy mappings for this home |
 | POST | `/api/homes/<slug>/proxy-mappings/` | Allocate a tunnel port and register in HAProxy |
 | DELETE | `/api/homes/<slug>/proxy-mappings/<key>/` | Remove a forwarding rule from HAProxy |
+
+#### Auth
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/authtoken/` | Obtain a token (username/password) |
+| DELETE | `/api/auth/token/` | Revoke the caller's own token |
 
 #### Admin-only endpoints
 
@@ -109,106 +116,117 @@ The API is browsable via Swagger UI when running in debug mode:
 
 ## Home system
 
-The `home/` directory contains everything needed to connect a home network to the cloud server.
+The `home/` directory contains everything needed to connect a home network to one or more cloud servers.
 
 ```
 home/
-├── config.yaml              # written by register_home.py — contains secrets, not committed
-├── config.yaml.example      # template showing all required fields
-├── certbot/                 # created on first certificate issuance, gitignored
-│   ├── config/              # certbot config and issued certificates
-│   ├── work/                # certbot working directory
-│   └── logs/                # certbot logs
+├── cah.py                               # single CLI: register / start / list / remove
+├── home.yaml.example                    # template for optional global settings (home.yaml)
+├── providers/                           # one subdirectory per registered cloud server ("profile")
+│   └── <name>/                          # e.g. providers/cloud-example-com/, gitignored
+│       ├── config.yaml                  # written by cah.py register — contains secrets
+│       ├── db.sqlite3                   # this profile's Home Console database
+│       ├── ssh_key / ssh_key.pub        # dedicated key pair for this profile's tunnel
+│       └── certbot/                     # created on first certificate issuance
+│           ├── config/                  # certbot config and issued certificates
+│           ├── work/                    # certbot working directory
+│           └── logs/                    # certbot logs
+├── providers/config.yaml.example        # template showing all fields for a single profile
 ├── scripts/
-│   ├── generate_keys.py     # generate a dedicated SSH key pair for tunnel use
-│   └── register_home.py     # register with the cloud server, write config.yaml
-└── django/                  # Home Console Django app
-    ├── cloudlink/           # config loading, cloud API client, dashboard
-    └── domains/             # domain, certificate, and tunnel management
+│   └── generate_keys.py                 # standalone: generate an SSH key pair (rarely needed — see below)
+└── django/                              # Home Console Django app (one process runs against one active profile)
+    ├── cloudlink/                       # config loading, cloud API client, dashboard
+    └── domains/                         # domain, certificate, and tunnel management
 ```
 
 ### Prerequisites
 
 - Python 3.11+
 - `certbot` CLI installed on the home machine (e.g. `sudo apt install certbot` or `pip install certbot`)
-- A registered account on the cloud server (see [User accounts](#user-accounts) above)
+- A registered, active account on the target cloud server (see [User accounts](#user-accounts) above)
+- The Home Console's dependencies installed once, up front — `cah.py` itself only needs `requests`/`pyyaml`, but it shells out to `manage.py` (migrations, tunnel sync, running the server), which needs the full Django environment:
+  ```bash
+  cd home/django
+  python -m venv .venv && source .venv/bin/activate
+  pip install -r requirements.txt
+  ```
 
-### Step 1 — Generate an SSH key pair
+### Registering with a new cloud site
 
-Run this once on the home machine. It creates a dedicated key pair for CloudAtHome tunnel use and prints the public key.
+Each cloud server you connect to gets its own **profile** under `home/providers/<name>/`, so the same home machine can stay connected to multiple independent cloud servers at once (e.g. a personal cloud and a family member's).
 
-```bash
-python home/scripts/generate_keys.py
-```
+**1. Get an API token from that cloud server's dashboard.** Log in at `http://<cloud-host>:8000/`, and if you don't already have one, click **Generate an API token**. It's shown only once — copy it now.
 
-By default the private key is written to `~/.ssh/cloudathome_ed25519`. Use `--output` to choose a different path:
-
-```bash
-python home/scripts/generate_keys.py --output /path/to/key
-```
-
-Use `--force` to overwrite an existing key pair.
-
-### Step 2 — Register the home with the cloud server
-
-This script authenticates with the cloud server, claims a home slot, and writes the connection config to `home/config.yaml`.
+**2. Run `cah.py register` with that token.** By default this generates a dedicated SSH key pair for the new profile, registers the home, and writes `home/providers/<name>/config.yaml` (the profile directory name defaults to a sanitized form of the cloud server's hostname; override it with `--name`):
 
 ```bash
-python home/scripts/register_home.py \
+cd home
+python cah.py register \
     --cloudserver-url https://cloud.example.com \
-    --username alice \
-    --password secret \
-    --public-key ~/.ssh/cloudathome_ed25519.pub \
-    --private-key ~/.ssh/cloudathome_ed25519
+    --token <token-from-the-dashboard> \
+    --name my-cloud
 ```
 
-On success it prints a summary:
+`--cloudserver-url` is optional: omit it to register against the default server (either `default_cloudserver_url` from an optional `home/home.yaml`, copied from `home.yaml.example`, or otherwise the public demo server, `http://cloudathome.retalia.org`) — so registering against the default is just `python cah.py register --token <token>`.
+
+On success it prints a summary, runs `manage.py migrate` for the new profile automatically, and tells you how to start it:
 
 ```
-Done. Configuration written to: home/config.yaml
+Done. Configuration written to: providers/my-cloud/config.yaml
   home_slug    : xK3mAbcDef9pQr
   ssh_username : home02_alice
   ssh_host     : cloud.example.com:22
   port range   : 2200 – 2209
+  console port : 8001
+
+Start this profile with:
+  python cah.py start --name my-cloud
 ```
 
-The generated `config.yaml` contains secrets (auth token, key path) and is gitignored. See `home/config.yaml.example` for the full schema.
+Pass `--public-key`/`--private-key` together instead if you want to bring your own existing key pair rather than generating a dedicated one (`generate_keys.py` is only needed for that path). If automatic migration fails, `cah.py register` tells you to run `manage.py migrate` yourself before starting — registration itself has already succeeded at that point.
 
-### Step 3 — Install dependencies and run the Home Console
+### Starting the Home Console
 
 ```bash
-cd home/django
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 0.0.0.0:8001
+python cah.py start --name my-cloud
 ```
 
-The Home Console is available at `http://localhost:8001/`. Django reads `config.yaml` at startup. If the file is missing or malformed, startup fails immediately with a clear error message.
+No port or `HOME_CONFIG` bookkeeping needed: `start` auto-assigned and remembered a port for this profile at registration time (or the first time you start it, if it was registered before this existed), reconnects any existing tunnels/mappings automatically (equivalent to the dashboard's "Connect all" — skip with `--no-sync`), then runs the Home Console at `http://localhost:<port>/`. Pass `--port` to override.
 
-> **Changing the config path:** Set the `HOME_CONFIG` environment variable to point at a different `config.yaml` if you want to keep it somewhere other than `home/`.
+### Listing registered profiles
+
+```bash
+python cah.py list
+```
+
+Purely local and instant (no network calls) — shows each profile's name, cloud server, home slug, console port, and whether it's currently running. Useful once you have more than one profile to keep track of.
+
+### Removing a profile
+
+```bash
+python cah.py remove --name my-cloud
+```
+
+Disconnects all tunnels, releases the home slot on the cloud server (which also cleans up this home's live HAProxy mappings, base domains, and bandwidth limit server-side), revokes this profile's API token, and — only once all of that has succeeded — permanently deletes `home/providers/my-cloud/` (database, certificates, SSH key). Prompts for confirmation first; skip it with `--yes`. If any step fails, nothing local is deleted and the error is printed — fix the issue and re-run to retry; it's safe to run more than once.
 
 ### Portability
 
-The entire home-side state lives in four portable pieces:
+Each profile's state lives entirely under its own `home/providers/<name>/` directory:
 
 | Piece | Default location | Configured by |
 |-------|-----------------|---------------|
-| Connection config | `home/config.yaml` | `HOME_CONFIG` env var |
-| Database | `home/db.sqlite3` | `database` in config.yaml |
-| TLS certificates | `home/certbot/` | certbot working directory |
-| SSH key pair | `~/.ssh/cloudathome_ed25519` | `--private-key` / `ssh.private_key_path` |
+| Connection config | `home/providers/<name>/config.yaml` | `HOME_CONFIG` env var |
+| Database | `home/providers/<name>/db.sqlite3` | `database` in config.yaml |
+| TLS certificates | `home/providers/<name>/certbot/` | certbot working directory |
+| SSH key pair | `home/providers/<name>/ssh_key` | `ssh.private_key_path` in config.yaml |
 
-To move the Home Console to another machine: copy those four items, update any absolute paths in `config.yaml`, and run `python manage.py runserver` as usual.
+To move a profile to another machine: copy its `home/providers/<name>/` directory, update any absolute paths in its `config.yaml`, and run `python cah.py start --name <name>` as usual.
 
-To switch between cloud servers (e.g. dev vs production), keep a separate `config.yaml` for each — with its own `database.path` — and select the active one with `HOME_CONFIG`:
+To run several cloud connections at once, just run `cah.py start` for each profile — each auto-assigned its own port at registration time:
 
 ```bash
-# production
-python manage.py runserver 0.0.0.0:8001
-
-# dev cloud
-HOME_CONFIG=home/config-dev.yaml python manage.py runserver 0.0.0.0:8001
+python cah.py start --name my-cloud     # e.g. port 8001
+python cah.py start --name family-cloud # e.g. port 8002
 ```
 
 ### Base domains
@@ -284,7 +302,7 @@ SSH process output (stdout/stderr) is inherited from the Django process and appe
 - **Sync** — idempotent reconnect: re-registers the cloud proxy mapping and reopens the tunnel if it is not running. Use this to recover a single entry after a crash or restart.
 
 **Global controls** (dashboard):
-- **Connect all** — syncs every proxy entry at once. The intended way to restore all tunnels after the Home Console restarts.
+- **Connect all** — syncs every proxy entry at once. `python cah.py start` already does this automatically on every launch (skip with `--no-sync`); use this button to reconnect without restarting the console.
 - **Disconnect all** — closes all tunnels and removes all cloud proxy mappings cleanly.
 
 **Management command** — the same sync operations are available from the command line:
@@ -319,57 +337,68 @@ docker compose -f cloud/compose.yaml up --build
 
 Go to `http://<cloud-host>:8000/signup/` and register. Log in to the Django admin at `http://<cloud-host>:8000/admin/` as the superuser, open the new user, tick **Active**, and save.
 
-### 3. Generate an SSH key pair (home machine)
+### 3. Generate an API token (cloud dashboard)
+
+Log in at `http://<cloud-host>:8000/`, and click **Generate an API token**. Copy it — it's shown only once.
+
+### 4. Install the Home Console's dependencies (once, home machine)
 
 ```bash
-python home/scripts/generate_keys.py
-# prints the public key; private key written to ~/.ssh/cloudathome_ed25519
+cd home/django
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
 ```
 
-### 4. Register the home (home machine)
+### 5. Register the home
 
 ```bash
-python home/scripts/register_home.py \
+python cah.py register \
     --cloudserver-url http://<cloud-host>:8000 \
-    --username alice \
-    --password secret \
-    --public-key ~/.ssh/cloudathome_ed25519.pub \
-    --private-key ~/.ssh/cloudathome_ed25519
+    --token <token-from-the-dashboard>
 ```
 
-This writes `home/config.yaml` with the assigned SSH username, port range, and auth token.
+This generates a dedicated SSH key pair, registers the home, runs `manage.py migrate` for the new profile automatically, and writes `home/providers/<name>/config.yaml` with the assigned SSH username, port range, console port, and auth token (`<name>` defaults to a sanitized form of `<cloud-host>`).
 
-### 5. Start the Home Console
+### 6. Start the Home Console
 
 ```bash
-cd home/django && source .venv/bin/activate
-python manage.py migrate
-python manage.py runserver 0.0.0.0:8001
+python cah.py start --name <name>
 ```
 
-### 6. Register a base domain
+No port or `HOME_CONFIG` bookkeeping needed — it uses the port assigned at registration.
 
-Go to `http://localhost:8001/` (the dashboard) and click **Register base domain**. Enter `mysite.example.com` and submit. This registers the domain with the cloud server; the home is now authorised to create proxy mappings for it and any of its subdomains.
+### 7. Register a base domain
 
-### 7. Add a domain and proxy entry
+Go to `http://localhost:<port>/` (the dashboard) and click **Register base domain**. Enter `mysite.example.com` and submit. This registers the domain with the cloud server; the home is now authorised to create proxy mappings for it and any of its subdomains.
 
-Go to `http://localhost:8001/domains/add/` and enter `mysite.example.com`. From the domain detail page click **Add** to create a proxy entry — choose scheme `http` and the port certbot will listen on (e.g. `8082`).
+### 8. Add a domain and proxy entry
 
-### 8. Open the tunnel and obtain a TLS certificate
+Go to `http://localhost:<port>/domains/add/` and enter `mysite.example.com`. From the domain detail page click **Add** to create a proxy entry — choose scheme `http` and the port certbot will listen on (e.g. `8082`).
+
+### 9. Open the tunnel and obtain a TLS certificate
 
 From the proxy entry detail page click **Open tunnel**, then enter your email and click **Issue certificate**. Wait for certbot to complete — the domain record is updated with the cert path on success.
 
-### 9. Open the tunnel for production traffic
+### 10. Open the tunnel for production traffic
 
-Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future Home Console restart, **Connect all** is the quickest way to bring everything back up.
+Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future restart, `python cah.py start --name <name>` reconnects everything automatically.
 
-### 10. Test
+### 11. Test
 
 ```bash
 curl https://mysite.example.com
 ```
 
 Traffic hits HAProxy on the cloud server, is routed by SNI through the SSH tunnel, and arrives at your home service.
+
+### 12. (Optional) Remove the home when you're done with it
+
+```bash
+python cah.py remove --name <name>
+```
+
+Tears down tunnels, releases the home slot and base domains on the cloud server, revokes the API token, and deletes `home/providers/<name>/`.
 
 ---
 
@@ -387,11 +416,18 @@ docker compose -f cloud/compose.yaml up --build
 
 Go to `http://localhost:8000/signup/` and register. Log in to the Django admin at `http://localhost:8000/admin/` as the superuser, open the new user, tick **Active**, and save.
 
-### 3. Register a home via the cloud web UI
+### 3. Register a home via the API
 
-Go to `http://localhost:8000/login/`. From the dashboard click **Register a home**, paste your SSH public key (e.g. the contents of `~/.ssh/id_ed25519.pub`), and submit.
+There's no web-form "register a home" flow — the dashboard only issues API tokens; registration itself goes through `POST /api/homes/`. Log in at `http://localhost:8000/login/` and click **Generate an API token**, then call the API directly with it:
 
-Note the assigned **SSH username** (e.g. `home00_alice`) and **port base** (e.g. `2000`).
+```bash
+curl -X POST http://localhost:8000/api/homes/ \
+    -H "Authorization: Token <token-from-the-dashboard>" \
+    -H "Content-Type: application/json" \
+    -d '{"public_key": "'"$(cat ~/.ssh/id_ed25519.pub)"'"}'
+```
+
+Note the assigned **SSH username** (e.g. `home00_alice`) and **port base** (e.g. `2000`) from the JSON response.
 
 ### 4. Start a local service to expose
 

@@ -1,6 +1,11 @@
 import argparse
+from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.contrib.auth.models import User
+from django.test import SimpleTestCase, TestCase
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
+from tunnels.models import Home, HomeBaseDomain
 from tunnels.ssh.manage_home import Config, TunnelManager, _build_parser
 import os
 import shutil
@@ -78,3 +83,74 @@ class TunnelManagerTest(SimpleTestCase):
 
         with self.assertRaises(ParserSeriousError):
             self.parser.parse_args(['add', 'otsakir#asdf', '15', '-p', 'authorized_keys'])
+
+
+class HomeDestroyCascadeTest(TestCase):
+    """Regression coverage for the slot-reuse leak: releasing a home must not leave
+    base domains, live mappings, or a bandwidth limit behind for the next occupant."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='alice', password='pw')
+        self.token = Token.objects.create(user=self.user)
+        # home_index 0 is already provisioned by migration 0003_provision_homes; claim it.
+        self.home = Home.objects.get(home_index=0)
+        self.home.user = self.user
+        self.home.public_key = 'ssh-ed25519 AAAA...'
+        self.home.slug = 'testslug'
+        self.home.bandwidth_limit_kbps = 5000
+        self.home.save()
+        HomeBaseDomain.objects.create(home=self.home, domain='example.com')
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    @patch('api.views.ElevatedOperations.remove_home_user')
+    @patch('api.views.HAProxyService.remove_tcp_mapping')
+    @patch('api.views.HAProxyService.remove_http_mapping')
+    @patch('api.views.HAProxyService.get_home_mappings')
+    def test_destroy_cascades_mappings_domains_and_bandwidth(
+        self, mock_get_mappings, mock_remove_http, mock_remove_tcp, mock_remove_user,
+    ):
+        mock_get_mappings.return_value = [
+            {'scheme': 'https', 'host': 'example.com', 'tunnel_port': 2000},
+            {'scheme': 'tcp', 'public_port': 10000, 'tunnel_port': 2001},
+        ]
+
+        resp = self.client.delete(f'/api/homes/{self.home.slug}/')
+
+        self.assertEqual(resp.status_code, 204)
+        mock_remove_http.assert_called_once_with('https', 'example.com')
+        mock_remove_tcp.assert_called_once_with(10000)
+        mock_remove_user.assert_called_once()
+
+        self.home.refresh_from_db()
+        self.assertIsNone(self.home.user)
+        self.assertIsNone(self.home.slug)
+        self.assertIsNone(self.home.public_key)
+        self.assertIsNone(self.home.bandwidth_limit_kbps)
+        self.assertEqual(self.home.base_domains.count(), 0)
+
+    @patch('api.views.ElevatedOperations.remove_home_user')
+    @patch('api.views.HAProxyService.get_home_mappings', return_value=[])
+    def test_destroy_twice_is_idempotent_not_500(self, mock_get_mappings, mock_remove_user):
+        first = self.client.delete(f'/api/homes/{self.home.slug}/')
+        self.assertEqual(first.status_code, 204)
+
+        second = self.client.delete(f'/api/homes/{self.home.slug}/')
+        self.assertEqual(second.status_code, 404)
+
+
+class RevokeTokenViewTest(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='bob', password='pw')
+        self.token = Token.objects.create(user=self.user)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def test_revoke_deletes_token_and_old_token_then_401s(self):
+        resp = self.client.delete('/api/auth/token/')
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(Token.objects.filter(user=self.user).count(), 0)
+
+        retry = self.client.get('/api/homes/')
+        self.assertEqual(retry.status_code, 401)

@@ -3,6 +3,7 @@ import secrets
 
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
 from tunnels.models import Home
 from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer, BaseDomainSerializer, BaseDomainResponseSerializer
 
@@ -29,7 +30,7 @@ from rest_framework import serializers as drf_serializers
     ),
     delete=extend_schema(
         summary='Release home slot',
-        description='Removes the SSH tunnel user and releases the home slot, making it available for other users. All active tunnels and HAProxy mappings must be removed by the home before calling this.',
+        description='Removes the SSH tunnel user and releases the home slot, making it available for other users. Also removes any live HAProxy mappings and registered base domains for this home, and clears its bandwidth limit, so none of it carries over to whoever claims this slot next.',
         responses={
             204: OpenApiResponse(description='Home released'),
             500: OpenApiResponse(description='Failed to remove tunnel user'),
@@ -96,18 +97,54 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
 
     def destroy(self, request, *args, **kwargs):
+        from django.db import transaction
+
         home = self.get_object()
+
+        port_base = tunnel_manager.get_home_port_base(home.home_index)
+        tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
+        mappings = HAProxyService.get_home_mappings(
+            port_base,
+            tunnel_manager.config.PORTS_PER_HOME,
+            tcp_public_port_base=tcp_port_base,
+            tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
+        )
+        for m in mappings:
+            if m['scheme'] == 'tcp':
+                HAProxyService.remove_tcp_mapping(m['public_port'])
+            else:
+                HAProxyService.remove_http_mapping(m['scheme'], m['host'])
 
         try:
             ElevatedOperations.remove_home_user(home.home_index, home.user.username)
         except Exception:
             return Response({'message': 'failed to remove tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        home.public_key = None
-        home.user = None
-        home.slug = None
-        home.save()
+        with transaction.atomic():
+            home.base_domains.all().delete()
+            home.public_key = None
+            home.user = None
+            home.slug = None
+            home.bandwidth_limit_kbps = None
+            home.save()
 
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema_view(
+    delete=extend_schema(
+        tags=['auth'],
+        summary='Revoke own API token',
+        description='Deletes the caller\'s own DRF auth token. Idempotent -- deleting an already-gone token still returns 204.',
+        responses={204: OpenApiResponse(description='Token revoked (or already gone)')},
+    )
+)
+class RevokeTokenView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        Token.objects.filter(user=request.user).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
