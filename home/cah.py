@@ -3,10 +3,10 @@
 Manage this home's connection(s) to CloudAtHome cloud server(s).
 
 Usage:
-    python cah.py register --token <api-token-from-the-dashboard> [--cloudserver-url URL] [--name myhome]
-    python cah.py start --name myhome [--port PORT] [--no-sync]
+    python cah.py register [myhome] --token <api-token-from-the-dashboard> [--cloudserver-url URL]
+    python cah.py start myhome [--port PORT] [--no-sync]
     python cah.py list
-    python cah.py remove --name myhome [--yes]
+    python cah.py remove myhome [--yes]
 
 Each registration gets its own profile directory under home/providers/<name>/, so the
 same client can stay connected to several cloud servers side by side (one `runserver`
@@ -91,7 +91,7 @@ def _suggest_profile_name(providers_dir, ssh_host):
 def _profile_config_path(name):
     config_path = _HOME_DIR / 'providers' / name / 'config.yaml'
     if not config_path.exists():
-        _error(f"no such profile: {name} (run 'python cah.py register --name {name} ...' first, "
+        _error(f"no such profile: {name} (run 'python cah.py register {name} ...' first, "
                f"or 'python cah.py list' to see what's registered)")
     return config_path
 
@@ -241,12 +241,12 @@ def cmd_register(args):
     result = _run_manage(output_path, 'migrate')
 
     if result.returncode == 0:
-        print(f'\nStart this profile with:\n  python cah.py start --name {profile_name}')
+        print(f'\nStart this profile with:\n  python cah.py start {profile_name}')
     else:
         print(f'Warning: automatic migration failed:\n{result.stderr}', file=sys.stderr)
         print('\nRegistration succeeded, but you need to run migrations yourself before starting:')
         print(f'  HOME_CONFIG={output_path} python django/manage.py migrate')
-        print(f'  python cah.py start --name {profile_name}')
+        print(f'  python cah.py start {profile_name}')
 
 
 def cmd_start(args):
@@ -335,6 +335,9 @@ def main():
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     p_register = subparsers.add_parser('register', help='Register this home with a cloud server')
+    p_register.add_argument('name', type=str, nargs='?', default=None,
+                             help='Profile directory name under home/providers/ (default: derived '
+                                  'from the cloud server hostname)')
     p_register.add_argument('--cloudserver-url', default=None,
                              help='Base URL of the cloud server (default: home.yaml\'s '
                                   f'default_cloudserver_url, or {DEFAULT_CLOUDSERVER_URL})')
@@ -344,15 +347,12 @@ def main():
                                   'dedicated keypair for this profile)')
     p_register.add_argument('--private-key', type=Path, default=None,
                              help='Path to an existing SSH private key (must be given together with --public-key)')
-    p_register.add_argument('--name', type=str, default=None,
-                             help='Profile directory name under home/providers/ (default: derived '
-                                  'from the cloud server hostname)')
     p_register.add_argument('--output', '-o', type=Path, default=None,
                              help='Output path for config.yaml (default: home/providers/<name>/config.yaml)')
     p_register.set_defaults(func=cmd_register)
 
     p_start = subparsers.add_parser('start', help='Start the Home Console for a profile')
-    p_start.add_argument('--name', required=True, help='Profile name (see: python cah.py list)')
+    p_start.add_argument('name', help='Profile name (see: python cah.py list)')
     p_start.add_argument('--port', type=int, default=None,
                           help='Port to serve on (default: auto-assigned and remembered per profile)')
     p_start.add_argument('--no-sync', action='store_true',
@@ -363,7 +363,7 @@ def main():
     p_list.set_defaults(func=cmd_list)
 
     p_remove = subparsers.add_parser('remove', help='Deregister a profile from its cloud server and delete it locally')
-    p_remove.add_argument('--name', required=True, help='Profile name (see: python cah.py list)')
+    p_remove.add_argument('name', help='Profile name (see: python cah.py list)')
     p_remove.add_argument('--yes', '-y', action='store_true', help='Skip the confirmation prompt')
     p_remove.set_defaults(func=cmd_remove)
 

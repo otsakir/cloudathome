@@ -99,7 +99,7 @@ class IssueCertificatePlaybook(Playbook):
         try:
             if entry.tunnel_pid:
                 TunnelService.close_tunnel(entry.tunnel_pid)
-            CloudServerClient().delete_proxy_mapping(domain_name)
+            CloudServerClient().delete_proxy_mapping('http', host=domain_name)
             entry.delete()
             entry = None
             steps.append(StepResult('Remove temporary HTTP proxy entry', 'ok', ''))

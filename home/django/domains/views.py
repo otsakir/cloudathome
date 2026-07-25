@@ -15,8 +15,10 @@ def _delete_proxy_entry(entry):
         TunnelService.close_tunnel(entry.tunnel_pid)
     client = CloudServerClient()
     try:
-        key = str(entry.public_port) if entry.scheme == ProxyEntry.SCHEME_TCP else entry.domain.name
-        client.delete_proxy_mapping(key)
+        if entry.scheme == ProxyEntry.SCHEME_TCP:
+            client.delete_proxy_mapping('tcp', public_port=entry.public_port)
+        else:
+            client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
     except Exception:
         pass
     entry.delete()

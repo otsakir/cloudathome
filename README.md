@@ -22,7 +22,7 @@ A system that allows running application servers at home and making them reachab
 ### How it works
 
 1. A home operator generates an API token from the cloud dashboard, then runs `python cah.py register` with that token. It registers the home (generating a dedicated SSH key pair by default), and writes the resulting connection details to a per-profile `home/providers/<name>/config.yaml`.
-2. `python cah.py start --name <name>` starts the Home Console Django app for that profile. A single home client can hold several such profiles side by side — one per cloud server — each run as its own process, started independently.
+2. `python cah.py start <name>` starts the Home Console Django app for that profile. A single home client can hold several such profiles side by side — one per cloud server — each run as its own process, started independently.
 3. For HTTP/HTTPS forwards, the operator first registers one or more **base domains** with the cloud server (e.g. `mysite.example.com`). The cloud enforces that no two homes can claim overlapping domains. The home is then authoritative for that domain and all its subdomains.
 4. The operator adds forwards in the Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in HAProxy on the cloud server (no persistent cloud-side state) and records the allocated tunnel port locally. HTTP/HTTPS forwards are only accepted if the hostname falls under one of the home's registered base domains.
 5. For HTTP/HTTPS forwards: the operator opens the SSH tunnel and triggers certificate issuance from the proxy entry page. Certbot runs standalone locally; Let's Encrypt validates via the tunnel. The certificate is stored under `home/certbot/`.
@@ -157,17 +157,16 @@ Each cloud server you connect to gets its own **profile** under `home/providers/
 
 **1. Get an API token from that cloud server's dashboard.** Log in at `http://<cloud-host>:8000/`, and if you don't already have one, click **Generate an API token**. It's shown only once — copy it now.
 
-**2. Run `cah.py register` with that token.** By default this generates a dedicated SSH key pair for the new profile, registers the home, and writes `home/providers/<name>/config.yaml` (the profile directory name defaults to a sanitized form of the cloud server's hostname; override it with `--name`):
+**2. Run `cah.py register <name>` with that token.** The profile name is a plain positional argument; if you omit it, one is derived from the cloud server's hostname. By default this generates a dedicated SSH key pair for the new profile, registers the home, and writes `home/providers/<name>/config.yaml`:
 
 ```bash
 cd home
-python cah.py register \
+python cah.py register my-cloud \
     --cloudserver-url https://cloud.example.com \
-    --token <token-from-the-dashboard> \
-    --name my-cloud
+    --token <token-from-the-dashboard>
 ```
 
-`--cloudserver-url` is optional: omit it to register against the default server (either `default_cloudserver_url` from an optional `home/home.yaml`, copied from `home.yaml.example`, or otherwise the public demo server, `http://cloudathome.retalia.org`) — so registering against the default is just `python cah.py register --token <token>`.
+`--cloudserver-url` is optional: omit it to register against the default server (either `default_cloudserver_url` from an optional `home/home.yaml`, copied from `home.yaml.example`, or otherwise the public demo server, `http://cloudathome.retalia.org`) — so registering against the default is just `python cah.py register my-cloud --token <token>`.
 
 On success it prints a summary, runs `manage.py migrate` for the new profile automatically, and tells you how to start it:
 
@@ -180,7 +179,7 @@ Done. Configuration written to: providers/my-cloud/config.yaml
   console port : 8001
 
 Start this profile with:
-  python cah.py start --name my-cloud
+  python cah.py start my-cloud
 ```
 
 Pass `--public-key`/`--private-key` together instead if you want to bring your own existing key pair rather than generating a dedicated one (`generate_keys.py` is only needed for that path). If automatic migration fails, `cah.py register` tells you to run `manage.py migrate` yourself before starting — registration itself has already succeeded at that point.
@@ -188,7 +187,7 @@ Pass `--public-key`/`--private-key` together instead if you want to bring your o
 ### Starting the Home Console
 
 ```bash
-python cah.py start --name my-cloud
+python cah.py start my-cloud
 ```
 
 No port or `HOME_CONFIG` bookkeeping needed: `start` auto-assigned and remembered a port for this profile at registration time (or the first time you start it, if it was registered before this existed), reconnects any existing tunnels/mappings automatically (equivalent to the dashboard's "Connect all" — skip with `--no-sync`), then runs the Home Console at `http://localhost:<port>/`. Pass `--port` to override.
@@ -204,7 +203,7 @@ Purely local and instant (no network calls) — shows each profile's name, cloud
 ### Removing a profile
 
 ```bash
-python cah.py remove --name my-cloud
+python cah.py remove my-cloud
 ```
 
 Disconnects all tunnels, releases the home slot on the cloud server (which also cleans up this home's live HAProxy mappings, base domains, and bandwidth limit server-side), revokes this profile's API token, and — only once all of that has succeeded — permanently deletes `home/providers/my-cloud/` (database, certificates, SSH key). Prompts for confirmation first; skip it with `--yes`. If any step fails, nothing local is deleted and the error is printed — fix the issue and re-run to retry; it's safe to run more than once.
@@ -220,13 +219,13 @@ Each profile's state lives entirely under its own `home/providers/<name>/` direc
 | TLS certificates | `home/providers/<name>/certbot/` | certbot working directory |
 | SSH key pair | `home/providers/<name>/ssh_key` | `ssh.private_key_path` in config.yaml |
 
-To move a profile to another machine: copy its `home/providers/<name>/` directory, update any absolute paths in its `config.yaml`, and run `python cah.py start --name <name>` as usual.
+To move a profile to another machine: copy its `home/providers/<name>/` directory, update any absolute paths in its `config.yaml`, and run `python cah.py start <name>` as usual.
 
 To run several cloud connections at once, just run `cah.py start` for each profile — each auto-assigned its own port at registration time:
 
 ```bash
-python cah.py start --name my-cloud     # e.g. port 8001
-python cah.py start --name family-cloud # e.g. port 8002
+python cah.py start my-cloud     # e.g. port 8001
+python cah.py start family-cloud # e.g. port 8002
 ```
 
 ### Base domains
@@ -358,12 +357,12 @@ python cah.py register \
     --token <token-from-the-dashboard>
 ```
 
-This generates a dedicated SSH key pair, registers the home, runs `manage.py migrate` for the new profile automatically, and writes `home/providers/<name>/config.yaml` with the assigned SSH username, port range, console port, and auth token (`<name>` defaults to a sanitized form of `<cloud-host>`).
+This generates a dedicated SSH key pair, registers the home, runs `manage.py migrate` for the new profile automatically, and writes `home/providers/<name>/config.yaml` with the assigned SSH username, port range, console port, and auth token (`<name>` defaults to a sanitized form of `<cloud-host>`; pass a name as the first argument to choose your own, e.g. `python cah.py register <name> --token ...`).
 
 ### 6. Start the Home Console
 
 ```bash
-python cah.py start --name <name>
+python cah.py start <name>
 ```
 
 No port or `HOME_CONFIG` bookkeeping needed — it uses the port assigned at registration.
@@ -382,7 +381,7 @@ From the proxy entry detail page click **Open tunnel**, then enter your email an
 
 ### 10. Open the tunnel for production traffic
 
-Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future restart, `python cah.py start --name <name>` reconnects everything automatically.
+Click **Open tunnel** on the proxy entry (if you closed it after cert issuance), or click **Connect all** on the dashboard to restore all tunnels at once. After any future restart, `python cah.py start <name>` reconnects everything automatically.
 
 ### 11. Test
 
@@ -395,7 +394,7 @@ Traffic hits HAProxy on the cloud server, is routed by SNI through the SSH tunne
 ### 12. (Optional) Remove the home when you're done with it
 
 ```bash
-python cah.py remove --name <name>
+python cah.py remove <name>
 ```
 
 Tears down tunnels, releases the home slot and base domains on the cloud server, revokes the API token, and deletes `home/providers/<name>/`.

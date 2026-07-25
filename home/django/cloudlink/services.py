@@ -30,18 +30,20 @@ class CloudServerClient:
             url = self._url(f'/api/homes/{slug}/proxy-mappings/tcp/')
             payload = {'public_port': public_port}
         else:
-            url = self._url(f'/api/homes/{slug}/proxy-mappings/http/')
+            url = self._url(f'/api/homes/{slug}/proxy-mappings/{scheme}/')
             payload = {'host': host, 'scheme': scheme}
         resp = requests.post(url, headers=self._headers(), json=payload)
         if resp.status_code != 201:
             raise CloudServerError(f'create_proxy_mapping failed: {resp.status_code} {resp.text}')
         return resp.json()
 
-    def delete_proxy_mapping(self, key):
-        resp = requests.delete(
-            self._url(f'/api/homes/{get_config().home_slug}/proxy-mappings/{key}/'),
-            headers=self._headers(),
-        )
+    def delete_proxy_mapping(self, scheme, host=None, public_port=None):
+        slug = get_config().home_slug
+        if scheme == 'tcp':
+            url = self._url(f'/api/homes/{slug}/proxy-mappings/tcp/{public_port}/')
+        else:
+            url = self._url(f'/api/homes/{slug}/proxy-mappings/{scheme}/{host}/')
+        resp = requests.delete(url, headers=self._headers())
         if resp.status_code != 204:
             raise CloudServerError(f'delete_proxy_mapping failed: {resp.status_code} {resp.text}')
 

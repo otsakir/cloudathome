@@ -158,9 +158,9 @@ class SyncService:
         # Remove any stale cloud mapping before re-creating it.
         try:
             if entry.scheme == ProxyEntry.SCHEME_TCP:
-                client.delete_proxy_mapping(str(entry.public_port))
+                client.delete_proxy_mapping('tcp', public_port=entry.public_port)
             else:
-                client.delete_proxy_mapping(entry.domain.name)
+                client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
         except Exception:
             pass
 
@@ -211,9 +211,9 @@ class SyncService:
         client = CloudServerClient()
         try:
             if entry.scheme == ProxyEntry.SCHEME_TCP:
-                client.delete_proxy_mapping(str(entry.public_port))
+                client.delete_proxy_mapping('tcp', public_port=entry.public_port)
             else:
-                client.delete_proxy_mapping(entry.domain.name)
+                client.delete_proxy_mapping(entry.scheme, host=entry.domain.name)
         except Exception:
             pass
         entry.tunnel_pid = None
