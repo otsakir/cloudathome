@@ -80,9 +80,9 @@
     </tbody>
   </table>
 {% else %}
-  <p>No domains yet. <a href="{% url 'add_domain' %}">Add one.</a></p>
+  <p>No domains yet.</p>
 {% endif %}
-<p><a href="{% url 'domain_list' %}">Manage forwarded domains</a></p>
+<p>{% if not domains %}<a href="{% url 'add_domain' %}">Add</a>{% endif %} <a href="{% url 'domain_list' %}">Manage</a></p>
 
 <h2>TCP forwards</h2>
 {% if tcp_entries %}
@@ -103,7 +103,7 @@
 {% else %}
   <p>No TCP forwards yet.</p>
 {% endif %}
-<p><a href="{% url 'add_tcp_proxy_entry' %}">Add TCP forward</a></p>
+<p><a href="{% url 'add_tcp_proxy_entry' %}">Add</a></p>
 
 <h2>Playbooks</h2>
 <table>
