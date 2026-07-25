@@ -1,5 +1,6 @@
 import sys
 import secrets
+import subprocess
 
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
@@ -73,7 +74,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
                     home.user.username,
                     s.validated_data['public_key'],
                 )
-            except Exception:
+            except subprocess.CalledProcessError:
                 return Response({'message': 'failed to update public key'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             home.public_key = s.validated_data['public_key']
             home.save()
@@ -88,7 +89,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
                     ElevatedOperations.set_home_bandwidth(home.home_index, new_limit)
                 else:
                     ElevatedOperations.unset_home_bandwidth(home.home_index)
-            except Exception:
+            except subprocess.CalledProcessError:
                 return Response({'message': 'failed to update bandwidth limit'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             home.bandwidth_limit_kbps = new_limit
             home.save()
@@ -117,7 +118,7 @@ class HomeRetrieveDestroyApiView(RetrieveDestroyAPIView):
 
         try:
             ElevatedOperations.remove_home_user(home.home_index, home.user.username)
-        except Exception:
+        except subprocess.CalledProcessError:
             return Response({'message': 'failed to remove tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         with transaction.atomic():
@@ -193,7 +194,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
 
         try:
             ElevatedOperations.add_home_user(available_home.home_index, request.user.username, s.validated_data['public_key'])
-        except Exception:
+        except subprocess.CalledProcessError:
             return Response({'message': 'failed to create tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         HomeSerializer().update(available_home, {**s.validated_data, 'user': request.user, 'slug': secrets.token_urlsafe(16)})
@@ -291,7 +292,7 @@ class SchemeProxyMappingCreateView(CreateAPIView):
 
         try:
             HAProxyService.add_mapping(scheme, tunnel_port, host=host)
-        except Exception:
+        except OSError:
             return Response({'message': 'failed to configure proxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme}, status=status.HTTP_201_CREATED)
@@ -349,7 +350,7 @@ class TcpProxyMappingCreateView(CreateAPIView):
 
         try:
             HAProxyService.add_mapping('tcp', tunnel_port, public_port=public_port)
-        except Exception:
+        except OSError:
             return Response({'message': 'failed to configure proxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({'public_port': public_port, 'tunnel_port': tunnel_port, 'scheme': 'tcp'}, status=status.HTTP_201_CREATED)
@@ -377,7 +378,7 @@ class SchemeProxyMappingDestroyAPIView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             HAProxyService.remove_http_mapping(scheme, host)
-        except Exception:
+        except OSError:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -402,7 +403,7 @@ class TcpProxyMappingDestroyAPIView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             HAProxyService.remove_tcp_mapping(port)
-        except Exception:
+        except OSError:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -420,7 +421,7 @@ class ProxyMappingDumpView(APIView):
     def get(self, request):
         try:
             entries = HAProxyService.dump_mappings()
-        except Exception:
+        except OSError:
             return Response({'message': 'failed to read proxy mappings from haproxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(entries)
 
@@ -512,7 +513,7 @@ class HomeSyncView(APIView):
                 try:
                     EO.add_home_user(home.home_index, home.user.username, home.public_key)
                     reconciled += 1
-                except Exception:
+                except subprocess.CalledProcessError:
                     return Response(
                         {'message': f'failed to recreate user for home {home.home_index}'},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR

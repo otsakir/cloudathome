@@ -1,3 +1,5 @@
+import subprocess
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User, Group
@@ -91,7 +93,7 @@ class EditHomeView(HomeOwnerMixin, FormView):
                 self.request.user.username,
                 form.cleaned_data['public_key'],
             )
-        except Exception:
+        except subprocess.CalledProcessError:
             messages.error(self.request, 'Failed to update public key.')
             return redirect('dashboard')
 
@@ -114,7 +116,7 @@ class ReleaseHomeView(HomeOwnerMixin, TemplateView):
         home = get_object_or_404(Home, user=request.user)
         try:
             ElevatedOperations.remove_home_user(home.home_index, home.user.username)
-        except Exception:
+        except subprocess.CalledProcessError:
             messages.error(request, 'Failed to remove tunnel user.')
             return redirect('dashboard')
 
