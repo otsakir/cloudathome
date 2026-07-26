@@ -151,9 +151,18 @@ class SyncService:
 
     @staticmethod
     def sync_entry(entry):
-        """Open tunnel + register cloud mapping for one entry. Idempotent."""
+        """Tear down and re-establish both the cloud mapping and the tunnel for one
+        entry. Always forces a fresh tunnel rather than trusting a still-running
+        local ssh process: a process can outlive the cloud restarting under it
+        (it takes ServerAliveInterval*ServerAliveCountMax to notice a dead
+        connection), so "still running" doesn't mean "still connected to the
+        current cloud instance." Idempotent."""
         from domains.models import ProxyEntry
         client = CloudServerClient()
+
+        if entry.tunnel_pid:
+            TunnelService.close_tunnel(entry.tunnel_pid)
+            entry.tunnel_pid = None
 
         # Remove any stale cloud mapping before re-creating it.
         try:
@@ -175,14 +184,13 @@ class SyncService:
             entry.save()
             raise
 
-        if not entry.tunnel_pid or not TunnelService.is_running(entry.tunnel_pid):
-            try:
-                pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port, entry.home_host)
-                entry.tunnel_pid = pid
-            except Exception:
-                entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
-                entry.save()
-                raise
+        try:
+            pid = TunnelService.open_tunnel(entry.tunnel_port, entry.home_port, entry.home_host)
+            entry.tunnel_pid = pid
+        except Exception:
+            entry.tunnel_status = ProxyEntry.TUNNEL_ERROR
+            entry.save()
+            raise
 
         entry.tunnel_status = ProxyEntry.TUNNEL_OPEN
         entry.save()
