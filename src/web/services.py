@@ -13,7 +13,7 @@ _BLANK_FIELD_COMMENTS = {
 
 
 class HomeConfigService:
-    """Builds the home/config.yaml contents for a registered home, and manages its API token."""
+    """Builds a home-side config.yaml template for a registered home, and manages its API token."""
 
     @staticmethod
     def get_or_create_token(user) -> Token:
@@ -32,7 +32,7 @@ class HomeConfigService:
 
     @staticmethod
     def build_yaml(request, home) -> str:
-        """Builds a template home/config.yaml for the given home.
+        """Builds a template config.yaml for the given home.
 
         auth_token and private_key_path are left blank (with an explanatory comment
         above each) so the file fails to load until the user fills them in themselves
