@@ -8,21 +8,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running & Building
 
-All services run via Docker Compose from the `cloud/` directory:
+All services run via Docker Compose:
 
 ```bash
 # Build and start all services
-docker compose -f cloud/compose.yaml up --build
+docker compose -f compose.yaml up --build
 
 # Start individual services
-docker compose -f cloud/compose.yaml up tunnelagent
-docker compose -f cloud/compose.yaml up haproxy
+docker compose -f compose.yaml up tunnelagent
+docker compose -f compose.yaml up haproxy
 ```
 
 ### Django (local development, outside Docker)
 
 ```bash
-cd cloud/src
+cd src
 source .venv/bin/activate
 
 # Run dev server
@@ -45,25 +45,25 @@ In local dev `HAPROXY_ENABLED=False` so HAProxy calls are skipped silently.
 
 ### Standalone pytest suite for `manage_home.py`
 
-`cloud/testsuite/` is a separate pytest project (not Django's test runner) that exercises `TunnelManager`/`BandwidthManager` logic in isolation via `tmp_path` fixtures:
+`testsuite/` is a separate pytest project (not Django's test runner) that exercises `TunnelManager`/`BandwidthManager` logic in isolation via `tmp_path` fixtures:
 
 ```bash
-cd cloud/testsuite
+cd testsuite
 pytest
 ```
 
-`pytest.ini` points `pythonpath` at `../src`, so it imports `tunnels.ssh.manage_home` directly. There's also a Django-integrated test module at `cloud/src/tunnels/tests/test_tunnels.py` covering similar ground via `manage.py test`.
+`pytest.ini` points `pythonpath` at `../src`, so it imports `tunnels.ssh.manage_home` directly. There's also a Django-integrated test module at `src/tunnels/tests/test_tunnels.py` covering similar ground via `manage.py test`.
 
 ### Home management script (requires sudo)
 
 ```bash
-sudo python cloud/src/tunnels/ssh/manage_home.py add <suffix> <home_id> -p <pubkey_file>
-sudo python cloud/src/tunnels/ssh/manage_home.py remove <suffix> <home_id>
-sudo python cloud/src/tunnels/ssh/manage_home.py update-key <suffix> <home_id> -p <pubkey_file>
-sudo python cloud/src/tunnels/ssh/manage_home.py reload
+sudo python src/tunnels/ssh/manage_home.py add <suffix> <home_id> -p <pubkey_file>
+sudo python src/tunnels/ssh/manage_home.py remove <suffix> <home_id>
+sudo python src/tunnels/ssh/manage_home.py update-key <suffix> <home_id> -p <pubkey_file>
+sudo python src/tunnels/ssh/manage_home.py reload
 
-sudo python cloud/src/tunnels/ssh/manage_home.py bandwidth set <home_id> --rate <kbps>
-sudo python cloud/src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
+sudo python src/tunnels/ssh/manage_home.py bandwidth set <home_id> --rate <kbps>
+sudo python src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 ```
 
 `add` and `remove` do not reload sshd automatically; `reload` must be called separately (as `ElevatedOperations` in `tunnels/services.py` does). `remove` also cleans up any bandwidth limit for the home. In the deployed container the script is installed on `PATH` as `manage_home.py`, which is how `ElevatedOperations` invokes it via `sudo`.
@@ -104,19 +104,18 @@ sudo python cloud/src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 ### Source layout
 
 ```
-cloud/
-├── compose.yaml                          # Orchestrates haproxy + tunnelagent (django)
-├── haproxy.dockerfile
-├── django.dockerfile
-├── docker/
-│   ├── haproxy/
-│   │   └── haproxy.cfg                   # HAProxy config (SNI/Host/TCP map routing, pre-created tunnel backends)
-│   └── django/
-│       ├── entrypoint.sh                 # Starts sshd + Django
-│       └── sudoers.d/tunneling           # Sudo grant for manage_home.py
-├── testsuite/                             # Standalone pytest suite (imports cloud/src via pythonpath)
-│   └── tests/test_manage_home.py
-└── src/
+compose.yaml                              # Orchestrates haproxy + tunnelagent (django)
+haproxy.dockerfile
+django.dockerfile
+docker/
+├── haproxy/
+│   └── haproxy.cfg                       # HAProxy config (SNI/Host/TCP map routing, pre-created tunnel backends)
+└── django/
+    ├── entrypoint.sh                     # Starts sshd + Django
+    └── sudoers.d/tunneling               # Sudo grant for manage_home.py
+testsuite/                                 # Standalone pytest suite (imports src via pythonpath)
+├── tests/test_manage_home.py
+src/
     ├── requirements.txt
     ├── manage.py
     ├── config/                            # Django project package (settings, urls, wsgi)

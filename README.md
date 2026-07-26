@@ -37,7 +37,7 @@ The home-side counterparts (`cah.py` CLI, Home Console Django app) are documente
 ### Running (Docker only)
 
 ```bash
-docker compose -f cloud/compose.yaml up --build
+docker compose -f compose.yaml up --build
 ```
 
 This starts two containers:
@@ -62,11 +62,11 @@ http://localhost:8000/admin/login/
 ### First-time database setup
 
 ```bash
-docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py migrate
-docker compose -f cloud/compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
+docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py migrate
+docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
 ```
 
-The SQLite database is stored outside the container at `cloud/src/var/db.sqlite3`.
+The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 
 The `migrate` step also provisions the 10 home slots (indices 0–9) automatically via the data migration `tunnels/migrations/0003_provision_homes.py`.
 
@@ -150,7 +150,7 @@ This walkthrough goes from a fresh cloud stack to a publicly reachable home serv
 ### 1. Start the cloud stack
 
 ```bash
-docker compose -f cloud/compose.yaml up --build
+docker compose -f compose.yaml up --build
 ```
 
 ### 2. Create and activate a cloud account
@@ -180,7 +180,7 @@ This walkthrough exercises the cloud stack locally — no real domain or DNS nee
 ### 1. Start the cloud stack
 
 ```bash
-docker compose -f cloud/compose.yaml up --build
+docker compose -f compose.yaml up --build
 ```
 
 ### 2. Sign up and activate an account
