@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**CloudAtHome** enables home-hosted application servers to be reachable from the internet via a cloud proxy. The cloud server component manages SSH reverse tunnels and HAProxy routing rules. The home server component (in `home/`) connects to the cloud server to register and establish tunnels.
+**CloudAtHome** enables home-hosted application servers to be reachable from the internet via a cloud proxy. This repo is the cloud-side component: it manages SSH reverse tunnels and HAProxy routing rules. The home-side component (the `cah.py` CLI and Home Console Django app that homes run locally to register and establish tunnels) lives in a separate repo: [otsakir/cloudathome-client](https://github.com/otsakir/cloudathome-client).
 
 ## Running & Building
 
@@ -79,7 +79,7 @@ sudo python cloud/src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 
 ### Request & tunnel flow
 
-1. A home network registers by `POST /api/homes/` (or via the web UI's "register home" flow) with its SSH public key.
+1. A home network registers by `POST /api/homes/` (via `cloudathome-client`'s `cah.py register`) with its SSH public key.
 2. Django calls `ElevatedOperations.add_home_user()` (in `tunnels/services.py`), which sudo-executes `manage_home.py`.
 3. `manage_home.py` creates a system user (`home<ID>_<username>`), installs the SSH key, and configures per-user `sshd` restrictions (TCP-forward only, no TTY/shell, allowed port range scoped to that home's block).
 4. The home network's gateway opens an SSH reverse tunnel on a port from its assigned range.
