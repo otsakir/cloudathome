@@ -47,17 +47,19 @@
 
 {% else %}
   <p>No home registered yet. Register one directly from your home machine:</p>
-  {% if has_token %}
-    <p>You already have an API token. It's only shown once, at generation time — if you don't have it saved, <a href="{% url 'rotate_token' %}">regenerate it</a> and substitute the new value below.</p>
-  {% else %}
-    <p><a href="{% url 'rotate_token' %}">Generate an API token</a> first, then substitute it below.</p>
-  {% endif %}
+<!--  {% if has_token %}-->
+<!--    <p>You already have an API token. It's only shown once, at generation time — if you don't have it saved, <a href="{% url 'rotate_token' %}">regenerate it</a> and substitute the new value below.</p>-->
+<!--  {% else %}-->
+<!--    <p><a href="{% url 'rotate_token' %}">Generate an API token</a> first, then substitute it below.</p>-->
+<!--  {% endif %}-->
   <pre><code>python cah.py register [myhome] --cloudserver-url {{ cloudserver_url }} --token &lt;your-token&gt;</code></pre>
   <p>
-    This authenticates with the token (not your account password), generates a dedicated
-    SSH keypair for this registration, and writes <code>config.yaml</code> into
-    <code>providers/&lt;name&gt;/</code> on your home machine. Then run:
+    Then start the local tunneling service:
   </p>
-  <pre><code>python cah.py start &lt;name&gt;</code></pre>
+  <pre><code>python cah.py start &lt;myhome&gt;</code></pre>
+  <p>
+    In case you don't have a token, <a href="{% url 'rotate_token' %}">generate</a> a new one.
+  </p>
+
 {% endif %}
 {% endblock %}
