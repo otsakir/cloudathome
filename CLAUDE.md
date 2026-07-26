@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CloudAtHome** enables home-hosted application servers to be reachable from the internet via a cloud proxy. This repo is the cloud-side component: it manages SSH reverse tunnels and HAProxy routing rules. The home-side component (the `cah.py` CLI and Home Console Django app that homes run locally to register and establish tunnels) lives in a separate repo: [otsakir/cloudathome-client](https://github.com/otsakir/cloudathome-client).
 
+Locally, that repo checks out as a sibling directory, `../cloudathome-client` relative to this one. Work spanning both sides of the system (e.g. a change to the REST API contract, or the `CloudServerClient`/`HAProxyService` URL shapes staying in sync) is typically done from a single Claude Code session rooted here, `cd`-ing into `../cloudathome-client` as needed rather than starting a separate session per repo.
+
 ## Running & Building
 
 All services run via Docker Compose:
