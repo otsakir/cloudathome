@@ -156,5 +156,5 @@ HAPROXY_API_HOST = 'localhost'
 HAPROXY_API_PORT = 9999
 
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
+LOGIN_REDIRECT_URL = '/home/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
