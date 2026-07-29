@@ -124,17 +124,6 @@ class ReleaseHomeView(HomeOwnerMixin, TemplateView):
         return redirect('dashboard')
 
 
-class ClientConfigView(HomeOwnerMixin, TemplateView):
-    template_name = 'web/client_config.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        home = get_object_or_404(Home, user=self.request.user)
-        context['home'] = home
-        context['config_yaml'] = HomeConfigService.build_yaml(self.request, home)
-        return context
-
-
 class RotateTokenView(HomeOwnerMixin, TemplateView):
     """Generates a fresh API token, whether or not a home is registered yet.
     rotate_token() deletes any existing token first, so this is also how a

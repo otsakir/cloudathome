@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'tunnels.apps.TunnelsConfig',
     'api.apps.ApiConfig',
     'web.apps.WebConfig',
+    'webpages.apps.WebpagesConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
