@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -155,6 +156,15 @@ CAH_SSH_PORT = 8022
 HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'
 HAPROXY_API_PORT = 9999
+
+
+def _parse_port_range(env_var, default):
+    lo, hi = os.environ.get(env_var, default).split('-')
+    return int(lo), int(hi) - int(lo) + 1
+
+
+HTTP_INBOUND_PORT_RANGE = _parse_port_range('HTTP_INBOUND_PORT_RANGE', '8080-8180')
+HTTPS_INBOUND_PORT_RANGE = _parse_port_range('HTTPS_INBOUND_PORT_RANGE', '8443-8543')
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/home/dashboard/'

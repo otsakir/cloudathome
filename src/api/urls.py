@@ -4,7 +4,7 @@ from .views import (
     ProxyMappingListView, SchemeProxyMappingCreateView, TcpProxyMappingCreateView,
     SchemeProxyMappingDestroyAPIView, TcpProxyMappingDestroyAPIView, ProxyInstanceAPIView,
     HomeRetrieveDestroyApiView, HomeListCreateAPIView, ProxyMappingDumpView, HomeSyncView,
-    BaseDomainListCreateView, BaseDomainDestroyView, RevokeTokenView,
+    BaseDomainListCreateView, BaseDomainDestroyView, RevokeTokenView, InboundPortRangeView,
 )
 
 
@@ -25,6 +25,8 @@ urlpatterns = [
     path('api/homes/<slug:home_slug>/proxy-mappings/<str:scheme>/<str:host>/', SchemeProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
 
     path('api/proxy/instance/', ProxyInstanceAPIView.as_view(), name='proxy-instance'),
+
+    path('api/config/inbound-ports/<str:scheme>/', InboundPortRangeView.as_view(), name='inbound-port-range'),
 
     path('api/admin/proxy-mappings/haproxy', ProxyMappingDumpView.as_view(), name='admin-proxy-mappings-haproxy'),
     path('api/admin/homes/sync', HomeSyncView.as_view(), name='admin-homes-sync'),

@@ -2,17 +2,18 @@ import sys
 import secrets
 import subprocess
 
+from django.conf import settings
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from tunnels.models import Home
-from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer, BaseDomainSerializer, BaseDomainResponseSerializer
+from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer, BaseDomainSerializer, BaseDomainResponseSerializer, InboundPortRangeSerializer
 
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from tunnels.models import HomeBaseDomain
-from tunnels.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home
+from tunnels.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home, DEFAULT_SCHEME_PORTS
 from tunnels.ssh.manage_home import tunnel_manager
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -184,7 +185,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
         summary='List active proxy mappings',
         description=(
             'Returns all active HAProxy mappings for this home, sourced live from HAProxy. '
-            'HTTP/HTTPS entries include `host`, `tunnel_port`, and `scheme`. '
+            'HTTP/HTTPS entries include `host`, `public_port`, `tunnel_port`, and `scheme`. '
             'TCP entries include `public_port`, `tunnel_port`, and `scheme`.'
         ),
         responses={
@@ -195,7 +196,7 @@ class HomeListCreateAPIView(ListCreateAPIView):
                     'scheme': drf_serializers.ChoiceField(choices=['http', 'https', 'tcp']),
                     'tunnel_port': drf_serializers.IntegerField(),
                     'host': drf_serializers.CharField(required=False, help_text='HTTP/HTTPS mappings only'),
-                    'public_port': drf_serializers.IntegerField(required=False, help_text='TCP mappings only'),
+                    'public_port': drf_serializers.IntegerField(help_text='Public-facing port for this mapping'),
                 },
             ),
         },
@@ -226,11 +227,15 @@ class ProxyMappingListView(ListAPIView):
             'Allocates a tunnel port and registers a forwarding rule in HAProxy for the given scheme and hostname. '
             'The scheme is specified as a URL path segment (`http` or `https`). '
             'The hostname must be the base domain or a subdomain of one already registered for this home. '
-            'Each scheme may have at most one active mapping per hostname.'
+            'Each scheme may have at most one active mapping per hostname. '
+            'An optional `public_port` selects which port the mapping is published on; omit it to use the '
+            'standard port (80 for HTTP, 443 for HTTPS), or supply a port within the range returned by '
+            'GET /api/config/inbound-ports/<scheme>/.'
         ),
         request=ProxyMappingHttpSerializer,
         responses={
             201: WebProxyMappingResponseSerializer,
+            400: OpenApiResponse(description='public_port is neither the scheme default nor within the advertised inbound range'),
             403: OpenApiResponse(description='Host is not under any registered base domain'),
             404: OpenApiResponse(description='Unknown scheme (must be http or https)'),
             409: OpenApiResponse(description='Mapping for this host and scheme already exists, or no free tunnel ports'),
@@ -258,6 +263,16 @@ class SchemeProxyMappingCreateView(CreateAPIView):
         if host in HAProxyService.get_used_hosts(scheme):
             return Response({'message': 'a mapping for this host already exists'}, status=status.HTTP_409_CONFLICT)
 
+        default_port = DEFAULT_SCHEME_PORTS[scheme]
+        public_port = s.validated_data.get('public_port') or default_port
+        if public_port != default_port:
+            range_base, range_count = getattr(settings, f'{scheme.upper()}_INBOUND_PORT_RANGE')
+            if not (range_base <= public_port < range_base + range_count):
+                return Response(
+                    {'message': f'public_port must be {default_port} (default) or in range {range_base}–{range_base + range_count - 1}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
         used = HAProxyService.get_used_ports()
@@ -267,11 +282,11 @@ class SchemeProxyMappingCreateView(CreateAPIView):
             return Response({'message': 'no free tunnel ports available'}, status=status.HTTP_409_CONFLICT)
 
         try:
-            HAProxyService.add_mapping(scheme, tunnel_port, host=host)
+            HAProxyService.add_mapping(scheme, tunnel_port, host=host, public_port=public_port)
         except OSError:
             return Response({'message': 'failed to configure proxy'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme}, status=status.HTTP_201_CREATED)
+        return Response({'host': host, 'tunnel_port': tunnel_port, 'scheme': scheme, 'public_port': public_port}, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(
@@ -350,10 +365,11 @@ class SchemeProxyMappingDestroyAPIView(APIView):
         if scheme not in ('http', 'https'):
             return Response(status=status.HTTP_404_NOT_FOUND)
         get_object_or_404(Home, slug=home_slug, user=request.user)
-        if host not in HAProxyService.get_used_hosts(scheme):
+        public_port = HAProxyService.get_host_public_port(scheme, host)
+        if public_port is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            HAProxyService.remove_http_mapping(scheme, host)
+            HAProxyService.remove_http_mapping(scheme, host, public_port)
         except OSError:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -388,6 +404,36 @@ class TcpProxyMappingDestroyAPIView(APIView):
 class ProxyInstanceAPIView(APIView):
     def get(self, request):
         pass
+
+
+@extend_schema(
+    tags=['config'],
+    summary='Get the supported inbound port range for a scheme',
+    description=(
+        'Returns the shared, system-wide port range available for HTTP or HTTPS proxy mappings, '
+        'in addition to the always-available standard port (80 for HTTP, 443 for HTTPS). '
+        'Unlike TCP forwarding, this range is not split per home -- any home may request a mapping '
+        'on any port in it, since HTTP/HTTPS mappings are routed by hostname, not port alone.'
+    ),
+    responses={
+        200: InboundPortRangeSerializer,
+        404: OpenApiResponse(description='Unknown scheme (must be http or https)'),
+    },
+)
+class InboundPortRangeView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    RANGES = {
+        'http': [settings.HTTP_INBOUND_PORT_RANGE],
+        'https': [settings.HTTPS_INBOUND_PORT_RANGE],
+    }
+
+    def get(self, request, scheme):
+        if scheme not in self.RANGES:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        ranges = [{'port_base': base, 'port_count': count} for base, count in self.RANGES[scheme]]
+        return Response({'scheme': scheme, 'ranges': ranges})
 
 
 class ProxyMappingDumpView(APIView):

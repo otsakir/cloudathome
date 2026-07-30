@@ -32,12 +32,20 @@ class HomeBandwidthSerializer(serializers.Serializer):
 
 class ProxyMappingHttpSerializer(serializers.Serializer):
     host = serializers.CharField(help_text='Hostname to expose (must be under a registered base domain)')
+    public_port = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1, max_value=65535,
+        help_text=(
+            'Public-facing port. Omit to use the standard port (80 for HTTP, 443 for HTTPS); '
+            'otherwise must be within the range returned by GET /api/config/inbound-ports/<scheme>/.'
+        ),
+    )
 
 
 class WebProxyMappingResponseSerializer(serializers.Serializer):
     scheme = serializers.ChoiceField(choices=['http', 'https'])
     host = serializers.CharField()
     tunnel_port = serializers.IntegerField()
+    public_port = serializers.IntegerField()
 
 
 class ProxyMappingTcpSerializer(serializers.Serializer):
@@ -48,6 +56,16 @@ class TcpProxyMappingResponseSerializer(serializers.Serializer):
     scheme = serializers.ChoiceField(choices=['tcp'])
     public_port = serializers.IntegerField()
     tunnel_port = serializers.IntegerField()
+
+
+class PortRangeSerializer(serializers.Serializer):
+    port_base = serializers.IntegerField()
+    port_count = serializers.IntegerField()
+
+
+class InboundPortRangeSerializer(serializers.Serializer):
+    scheme = serializers.ChoiceField(choices=['http', 'https'])
+    ranges = PortRangeSerializer(many=True)
 
 
 class BaseDomainSerializer(serializers.Serializer):

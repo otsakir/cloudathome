@@ -13,6 +13,8 @@ SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
 HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
 TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
+DEFAULT_SCHEME_PORTS = {'http': 80, 'https': 443}
+
 
 class HAProxyService:
 
@@ -35,16 +37,16 @@ class HAProxyService:
     @classmethod
     def add_mapping(cls, scheme, tunnel_port, host=None, public_port=None):
         if scheme == 'https':
-            cls._send_command(f'add map {SNI_MAP_FILE} {host} tunnel_{tunnel_port}')
+            cls._send_command(f'add map {SNI_MAP_FILE} {host}:{public_port} tunnel_{tunnel_port}')
         elif scheme == 'http':
-            cls._send_command(f'add map {HTTP_MAP_FILE} {host} http_tunnel_{tunnel_port}')
+            cls._send_command(f'add map {HTTP_MAP_FILE} {host}:{public_port} http_tunnel_{tunnel_port}')
         elif scheme == 'tcp':
             cls._send_command(f'add map {TCP_MAP_FILE} {public_port} tunnel_{tunnel_port}')
 
     @classmethod
-    def remove_http_mapping(cls, scheme: str, host: str):
+    def remove_http_mapping(cls, scheme: str, host: str, public_port: int):
         map_file = SNI_MAP_FILE if scheme == 'https' else HTTP_MAP_FILE
-        cls._send_command(f'del map {map_file} {host}')
+        cls._send_command(f'del map {map_file} {host}:{public_port}')
 
     @classmethod
     def remove_tcp_mapping(cls, public_port: int):
@@ -65,8 +67,17 @@ class HAProxyService:
                     if scheme == 'tcp':
                         entries.append({'public_port': int(parts[1]), 'backend': parts[2], 'scheme': 'tcp'})
                     else:
-                        entries.append({'host': parts[1], 'backend': parts[2], 'scheme': scheme})
+                        host, _, port_str = parts[1].rpartition(':')
+                        entries.append({'host': host, 'public_port': int(port_str), 'backend': parts[2], 'scheme': scheme})
         return entries
+
+    @classmethod
+    def get_host_public_port(cls, scheme, host):
+        """Return the public_port currently registered for host under scheme, or None."""
+        for entry in cls.dump_mappings():
+            if entry.get('scheme') == scheme and entry.get('host') == host:
+                return entry['public_port']
+        return None
 
     @classmethod
     def get_used_ports(cls):
@@ -101,7 +112,7 @@ class HAProxyService:
     def get_home_mappings(cls, port_base, port_count, tcp_public_port_base=None, tcp_public_port_count=None):
         """Return all active mappings for a home as dicts.
 
-        HTTP/HTTPS entries: {host, tunnel_port, scheme}
+        HTTP/HTTPS entries: {host, public_port, tunnel_port, scheme}
         TCP entries:        {public_port, tunnel_port, scheme}
         """
         tunnel_ports = set(range(port_base, port_base + port_count))
@@ -121,7 +132,7 @@ class HAProxyService:
                 if pub_port in tcp_public_ports:
                     result.append({'public_port': pub_port, 'tunnel_port': tunnel_port, 'scheme': 'tcp'})
             elif tunnel_port in tunnel_ports:
-                result.append({'host': entry['host'], 'tunnel_port': tunnel_port, 'scheme': scheme})
+                result.append({'host': entry['host'], 'public_port': entry.get('public_port'), 'tunnel_port': tunnel_port, 'scheme': scheme})
         return result
 
 
@@ -253,7 +264,7 @@ def release_home(home):
         if m['scheme'] == 'tcp':
             HAProxyService.remove_tcp_mapping(m['public_port'])
         else:
-            HAProxyService.remove_http_mapping(m['scheme'], m['host'])
+            HAProxyService.remove_http_mapping(m['scheme'], m['host'], m['public_port'])
 
     ElevatedOperations.remove_home_user(home.home_index, home.user.username)
 

@@ -10,6 +10,12 @@ Locally, that repo checks out as a sibling directory, `../cloudathome-client` re
 
 ## Running & Building
 
+Docker Compose needs `HTTP_INBOUND_PORT_RANGE`/`HTTPS_INBOUND_PORT_RANGE` set (see
+`.env.example`) before it will start at all — `cp .env.example .env` once per
+checkout. Without it, `docker compose up`/`config` fails outright (`no port
+specified: :<empty>`), since these vars are substituted directly into `ports:` and
+into `haproxy.cfg`'s `bind` lines.
+
 All services run via Docker Compose:
 
 ```bash
@@ -76,7 +82,7 @@ sudo python src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 
 | Component | Port(s) | Role |
 |-----------|---------|------|
-| **HAProxy** (cloud proxy) | 80/443 (HTTP/HTTPS), 10000–10099 (raw TCP forwards), 9999 (Runtime API) | SNI-based HTTPS ingress, Host-based HTTP ingress, and raw TCP passthrough; routes traffic to per-home SSH tunnel ports via map files |
+| **HAProxy** (cloud proxy) | 80/443 (HTTP/HTTPS standard), a configurable shared HTTP/HTTPS inbound range (`HTTP_INBOUND_PORT_RANGE`/`HTTPS_INBOUND_PORT_RANGE`, `.env`), 10000–10099 (raw TCP forwards), 9999 (Runtime API) | SNI-based HTTPS ingress, Host-based HTTP ingress, and raw TCP passthrough; routes traffic to per-home SSH tunnel ports via map files |
 | **Django** (`tunnelagent`: Django + sshd) | 8000 (API), 8022 (SSH) | REST API + web UI for managing homes/proxy mappings; SSH server that accepts reverse tunnels from home networks |
 
 ### Request & tunnel flow
@@ -85,8 +91,8 @@ sudo python src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 2. Django calls `ElevatedOperations.add_home_user()` (in `tunnels/services.py`), which sudo-executes `manage_home.py`.
 3. `manage_home.py` creates a system user (`home<ID>_<username>`), installs the SSH key, and configures per-user `sshd` restrictions (TCP-forward only, no TTY/shell, allowed port range scoped to that home's block).
 4. The home network's gateway opens an SSH reverse tunnel on a port from its assigned range.
-5. The home registers one or more **base domains** (`POST /api/homes/<slug>/base-domains/`), then calls `POST /api/homes/<slug>/proxy-mappings/<scheme>/` (scheme = `http`/`https`, hostname must be under a registered base domain) or `POST /api/homes/<slug>/proxy-mappings/tcp/` (raw TCP, using a public port from the home's dedicated TCP port range). The cloud allocates a free tunnel port from the home's range, updates the HAProxy map via the Runtime API, and returns the allocated port. No mapping state is persisted in the cloud database — HAProxy's live maps are the source of truth.
-6. HAProxy routes incoming HTTPS traffic by SNI hostname, HTTP traffic by Host header, and TCP traffic by public port, to the matching tunnel backend.
+5. The home registers one or more **base domains** (`POST /api/homes/<slug>/base-domains/`), then calls `POST /api/homes/<slug>/proxy-mappings/<scheme>/` (scheme = `http`/`https`, hostname must be under a registered base domain; optional `public_port` — defaults to 80/443, or a port from the shared range advertised by `GET /api/config/inbound-ports/<scheme>/`) or `POST /api/homes/<slug>/proxy-mappings/tcp/` (raw TCP, using a public port from the home's dedicated TCP port range). The cloud allocates a free tunnel port from the home's range, updates the HAProxy map via the Runtime API, and returns the allocated port. No mapping state is persisted in the cloud database — HAProxy's live maps are the source of truth.
+6. HAProxy routes incoming HTTPS traffic by SNI hostname + public port, HTTP traffic by Host header + public port, and TCP traffic by public port alone, to the matching tunnel backend.
 7. Optionally, a home can set a per-home egress **bandwidth limit** (`PATCH /api/homes/<slug>/` with `bandwidth_limit_kbps`), enforced via `tc` HTB classes + `iptables` fwmark rules on the tunnel's outbound interface.
 
 ### Key design points
@@ -97,6 +103,7 @@ sudo python src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 - **Username format**: `home<XX>_<django_username>` (e.g. `home00_alice`). The Django username is the SSH suffix.
 - **Public keys** are staged to `/var/tunnelagent/public_keys/` before being passed to `manage_home.py`.
 - **HAProxy routing**: tunnel backends are pre-created in `haproxy.cfg` for the full SSH port range and the TCP public port range. Three runtime map files drive routing: `sni_backends.map` (HTTPS SNI → backend), `host_http_backends.map` (HTTP Host → backend), `tcp_backends.map` (public TCP port → backend). All are updated at runtime via the HAProxy Runtime API on port 9999 and start empty on each container start; homes are responsible for re-registering their mappings after a restart.
+- **HTTP/HTTPS inbound port range**: in addition to the standard 80/443, `https_frontend`/`http_frontend` also bind a configurable shared range (`HTTP_INBOUND_PORT_RANGE`/`HTTPS_INBOUND_PORT_RANGE`, threaded from the root `.env` through `compose.yaml` and into `haproxy.cfg`'s `bind "*:$VAR"` lines via HAProxy's own env-var expansion — see `docker/haproxy/haproxy.cfg`). Unlike the TCP range, this range is **not split per home** — any home may use any port in it, because HTTP/HTTPS mappings are routed by hostname, and `BaseDomainService` already guarantees hostnames can't collide across homes. To make that safe, `sni_backends.map`/`host_http_backends.map` keys are composite `hostname:port` (built via `tcp-request content set-var(txn.dstport) dst_port` / `http-request set-var(txn.dstport) dst_port` + `concat(:,txn.dstport,)` in the `use_backend` line), so a mapping only matches the specific port it was registered on. `HAProxyService.add_mapping`/`dump_mappings`/`get_host_public_port` (`tunnels/services.py`) build and parse these composite keys; a home requests a custom port via `public_port` on `POST .../proxy-mappings/<scheme>/`, validated against `settings.HTTP_INBOUND_PORT_RANGE`/`HTTPS_INBOUND_PORT_RANGE`. Changing the range in `.env` requires recreating the `haproxy`/`tunnelagent` containers (env vars are read at container start, not by the seamless `SIGUSR2` config reload) — see `GET /api/config/inbound-ports/<scheme>/` for how a home discovers the current range.
 - **Base domains**: a home must register a base domain (`HomeBaseDomain`) before it can create HTTP/HTTPS mappings for hostnames under it. `BaseDomainService` prevents one home from registering a domain that overlaps (as parent or subdomain) with another home's registered domain, and blocks domain removal while live HAProxy mappings still exist under it.
 - **Bandwidth limiting**: `BandwidthManager` (in `manage_home.py`) creates an HTB class per home on the tunnel-facing interface and an `iptables` mangle rule that marks packets sourced from that home's SSH tunnel port range, so the limit applies regardless of which mapping/service is using the tunnel.
 - **Home ownership**: `Home.user` is a FK to Django's `User` with `PROTECT` — a user cannot be deleted while they have assigned homes. A user may hold at most one home slot.
@@ -106,6 +113,7 @@ sudo python src/tunnels/ssh/manage_home.py bandwidth unset <home_id>
 ### Source layout
 
 ```
+.env.example                              # Template for HTTP/HTTPS inbound port range vars; cp to .env
 compose.yaml                              # Orchestrates haproxy + tunnelagent (django)
 haproxy.dockerfile
 django.dockerfile
@@ -138,7 +146,8 @@ src/
     ├── api/                                # DRF REST API (thin layer over tunnels/)
     │   ├── views.py
     │   ├── serializers.py
-    │   └── urls.py
+    │   ├── urls.py
+    │   └── tests.py
     └── web/                                # MVC web UI
         ├── views.py
         ├── forms.py
@@ -158,10 +167,11 @@ src/
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (must have no active mappings under it) |
 | GET | `/api/homes/<slug>/proxy-mappings/` | List caller's active HAProxy mappings (HTTP/HTTPS + TCP) |
-| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`, hostname must be under a registered base domain) |
-| DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy |
+| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`, hostname must be under a registered base domain; optional `public_port`, defaults to 80/443) |
+| DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy (looks up whatever port that host is currently mapped to; each `(scheme, host)` has at most one active mapping) |
 | POST | `/api/homes/<slug>/proxy-mappings/tcp/` | Allocate a tunnel port and register a raw TCP mapping (public port must be in this home's TCP port range) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/tcp/<port>/` | Remove a TCP forwarding rule from HAProxy |
+| GET | `/api/config/inbound-ports/<scheme>/` | Get the shared, system-wide inbound port range available for HTTP/HTTPS mappings (`scheme` = `http`/`https`) |
 | POST | `/api/auth/authtoken/` | Obtain a token (username/password) |
 | DELETE | `/api/auth/token/` | Revoke the caller's own token |
 | GET | `/api/admin/proxy-mappings/haproxy` | Dump current live HAProxy map entries (admin only) |

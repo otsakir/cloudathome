@@ -23,7 +23,7 @@ Where this is headed: replacing the SSH-tunnel transport with WireGuard (see `RO
 
 | Component | Role |
 |-----------|------|
-| **HAProxy** | HTTPS ingress on port 443 (SNI-based routing) and TCP forwarding on ports 10000–10099 (port-based routing). Routes traffic to per-home SSH tunnel ports via runtime-updated map files. |
+| **HAProxy** | HTTPS ingress on port 443 (SNI-based routing) plus a configurable shared range of alternate HTTP/HTTPS ports, and TCP forwarding on ports 10000–10099 (port-based routing). Routes traffic to per-home SSH tunnel ports via runtime-updated map files. |
 | **Django + sshd** | REST API and web UI for managing homes and proxy mappings. SSH server that accepts reverse tunnels from home networks. |
 
 ### Request & tunnel lifecycle
@@ -33,7 +33,7 @@ This is what happens end to end, across both repos, once a cloud server is up an
 1. A home operator generates an API token from this cloud server's dashboard, then registers using `cloudathome-client` (generating a dedicated SSH key pair by default), which writes the resulting connection details to a local per-profile config file.
 2. The home side starts its own Home Console for that profile. A single home client can hold several such profiles side by side — one per cloud server — each run as its own process, started independently.
 3. For HTTP/HTTPS forwards, the home first registers one or more **base domains** with the cloud server (e.g. `mysite.example.com`). The cloud enforces that no two homes can claim overlapping domains. The home is then authoritative for that domain and all its subdomains.
-4. The home adds forwards from its Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in this cloud server's HAProxy (no persistent cloud-side state) and records the allocated tunnel port on the home side. HTTP/HTTPS forwards are only accepted if the hostname falls under one of the home's registered base domains.
+4. The home adds forwards from its Home Console — either HTTP/HTTPS (domain-based) or TCP (port-based). Each forward registers a mapping directly in this cloud server's HAProxy (no persistent cloud-side state) and records the allocated tunnel port on the home side. HTTP/HTTPS forwards are only accepted if the hostname falls under one of the home's registered base domains. By default an HTTP/HTTPS forward publishes on the standard port (80/443); the home can instead request a port from this cloud's advertised alternate range (see [Custom HTTP/HTTPS inbound ports](#custom-httphttps-inbound-ports) below) — useful if the home's own network blocks outbound access to the standard ports, or it wants more than one independent entry point.
 5. For HTTP/HTTPS forwards: the home opens the SSH tunnel and triggers certificate issuance locally. Certbot runs standalone on the home side; Let's Encrypt validates via the tunnel.
 6. The home closes the temporary tunnel if needed, or keeps it open for production traffic.
 7. Incoming HTTPS traffic hits this cloud server's HAProxy on port 443, routed by SNI hostname through the tunnel. Incoming TCP traffic hits HAProxy on the allocated public port (10000–10099), routed by destination port through the tunnel.
@@ -43,12 +43,23 @@ This is what happens end to end, across both repos, once a cloud server is up an
 
 ### Running (Docker only)
 
+Docker Compose needs the HTTP/HTTPS inbound port range configured before it will
+start — copy the template once per checkout:
+
+```bash
+cp .env.example .env
+```
+
+The defaults (`8080-8180` for HTTP, `8443-8543` for HTTPS) work out of the box;
+edit `.env` if you want a different range. Without a `.env` file, `docker compose up`
+fails outright rather than silently skipping the feature.
+
 ```bash
 docker compose -f compose.yaml up --build
 ```
 
 This starts two containers:
-- **haproxy** — listens on ports 80 and 443 (HTTP/HTTPS) and 10000–10099 (TCP forwards)
+- **haproxy** — listens on ports 80 and 443 (HTTP/HTTPS), the alternate HTTP/HTTPS range from `.env`, and 10000–10099 (TCP forwards)
 - **tunnelagent** — Django API on port 8000, SSH server on port 8022
 
 HAProxy must pass its health check before `tunnelagent` starts.
@@ -116,10 +127,11 @@ This is the contract the home-side client (`cah.py` / Home Console) talks to —
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (blocked if active proxy mappings exist under it) |
 | GET | `/api/homes/<slug>/proxy-mappings/` | List active HAProxy mappings (HTTP/HTTPS + TCP) for this home |
-| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`; hostname must be under a registered base domain) |
+| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`; hostname must be under a registered base domain; optional `public_port`, defaults to 80/443) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy |
 | POST | `/api/homes/<slug>/proxy-mappings/tcp/` | Allocate a tunnel port and register a raw TCP mapping (public port must be in this home's TCP port range) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/tcp/<port>/` | Remove a TCP forwarding rule from HAProxy |
+| GET | `/api/config/inbound-ports/<scheme>/` | Get the shared, system-wide inbound port range for HTTP/HTTPS mappings |
 
 #### Auth
 
@@ -157,6 +169,31 @@ iptables -t mangle -A OUTPUT -p tcp --sport <port_low>:<port_high> -j MARK --set
 
 All egress TCP traffic sourced from the home's tunnel port range is marked, then shaped through the HTB leaf class at the configured rate; unrelated traffic on your server is unaffected. Since `tc`/`iptables` rules don't survive a container restart, the `reconcile_bandwidth` management command re-applies all limits from the database automatically on container start — you don't need to do this yourself.
 
+
+### Custom HTTP/HTTPS inbound ports
+
+By default, HTTP/HTTPS proxy mappings publish on the standard port (80/443). This
+cloud server can also advertise a **shared, system-wide alternate port range** —
+unlike the TCP range, it's not split per home, since HTTP/HTTPS mappings are routed
+by hostname (which the cloud already guarantees can't collide across homes), not by
+port alone. A home requests a custom port via `public_port` when creating a mapping
+(`POST /api/homes/<slug>/proxy-mappings/<scheme>/`), or discovers what's available
+via `GET /api/config/inbound-ports/<scheme>/`.
+
+**As the operator, you configure the range once, in `.env`:**
+
+```
+HTTP_INBOUND_PORT_RANGE=8080-8180
+HTTPS_INBOUND_PORT_RANGE=8443-8543
+```
+
+This single value is threaded through `compose.yaml` (published ports on the
+`haproxy` container) and `docker/haproxy/haproxy.cfg` (the extra `bind` lines,
+via HAProxy's own environment-variable expansion) — you only ever edit it in one
+place. **Changing it requires recreating the `haproxy` and `tunnelagent`
+containers** (`docker compose up -d --build`), not just a config reload — unlike
+map updates (which the Runtime API applies live), the actual set of listening
+ports is fixed for the lifetime of the process.
 
 ## Home-side client
 

@@ -5,10 +5,15 @@ services:
       dockerfile: haproxy.dockerfile
     volumes:
       - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    environment:
+      HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
+      HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
     ports:
       - "80:80"
       - "443:443"
       - "10000-10099:10000-10099"
+      - "${HTTP_INBOUND_PORT_RANGE}:${HTTP_INBOUND_PORT_RANGE}"
+      - "${HTTPS_INBOUND_PORT_RANGE}:${HTTPS_INBOUND_PORT_RANGE}"
     user: haproxy
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9999 || exit 1"]
@@ -32,6 +37,8 @@ services:
       - 8000:8000
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.docker_settings
+      HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
+      HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
     cap_add:
       - NET_ADMIN
     volumes:

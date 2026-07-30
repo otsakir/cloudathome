@@ -111,14 +111,14 @@ class HomeDestroyCascadeTest(TestCase):
         self, mock_get_mappings, mock_remove_http, mock_remove_tcp, mock_remove_user,
     ):
         mock_get_mappings.return_value = [
-            {'scheme': 'https', 'host': 'example.com', 'tunnel_port': 2000},
+            {'scheme': 'https', 'host': 'example.com', 'public_port': 443, 'tunnel_port': 2000},
             {'scheme': 'tcp', 'public_port': 10000, 'tunnel_port': 2001},
         ]
 
         resp = self.client.delete(f'/api/homes/{self.home.slug}/')
 
         self.assertEqual(resp.status_code, 204)
-        mock_remove_http.assert_called_once_with('https', 'example.com')
+        mock_remove_http.assert_called_once_with('https', 'example.com', 443)
         mock_remove_tcp.assert_called_once_with(10000)
         mock_remove_user.assert_called_once()
 
