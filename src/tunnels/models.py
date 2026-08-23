@@ -7,7 +7,10 @@ from tunnels.ssh.manage_home import tunnel_manager
 
 class Home(models.Model):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name='homes')
-    home_index = models.IntegerField(primary_key=True, validators=[MinValueValidator(0), MaxValueValidator(9)])
+    home_index = models.IntegerField(
+        primary_key=True,
+        validators=[MinValueValidator(0), MaxValueValidator(tunnel_manager.config.MAX_HOME_COUNT - 1)],
+    )
     public_key = models.TextField(max_length=800, blank=True, null=True)
     slug = models.CharField(max_length=32, unique=True, null=True, blank=True)
     bandwidth_limit_kbps = models.PositiveIntegerField(null=True, blank=True)
