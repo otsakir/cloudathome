@@ -8,15 +8,17 @@ services:
     environment:
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
+      TCP_PUBLIC_PORT_RANGE: "${TCP_PUBLIC_PORT_RANGE}"
+      HAPROXY_API_PORT: "${HAPROXY_API_PORT}"
     ports:
       - "80:80"
       - "443:443"
-      - "10000-10099:10000-10099"
+      - "${TCP_PUBLIC_PORT_RANGE}:${TCP_PUBLIC_PORT_RANGE}"
       - "${HTTP_INBOUND_PORT_RANGE}:${HTTP_INBOUND_PORT_RANGE}"
       - "${HTTPS_INBOUND_PORT_RANGE}:${HTTPS_INBOUND_PORT_RANGE}"
     user: haproxy
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 9999 || exit 1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 ${HAPROXY_API_PORT} || exit 1"]
       interval: 2s
       timeout: 3s
       retries: 10
@@ -33,12 +35,14 @@ services:
       haproxy:
         condition: service_healthy
     ports:
-      - 8022:22
+      - "${CAH_SSH_PORT}:22"
       - 8000:8000
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.docker_settings
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
+      CAH_SSH_PORT: "${CAH_SSH_PORT}"
+      HAPROXY_API_PORT: "${HAPROXY_API_PORT}"
     cap_add:
       - NET_ADMIN
     volumes:

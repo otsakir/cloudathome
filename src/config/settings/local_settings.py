@@ -151,11 +151,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Cloud-at-home settings
 
 CAH_PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'
-CAH_SSH_PORT = 8022
+CAH_SSH_PORT = int(os.environ.get('CAH_SSH_PORT', '8022'))
 
 HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'
-HAPROXY_API_PORT = 9999
+HAPROXY_API_PORT = int(os.environ.get('HAPROXY_API_PORT', '9999'))
 
 
 def _parse_port_range(env_var, default):

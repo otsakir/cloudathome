@@ -10,5 +10,5 @@ DATABASES = {
 
 HAPROXY_ENABLED = True
 HAPROXY_API_HOST = 'haproxy'
-HAPROXY_API_PORT = 9999
+# HAPROXY_API_PORT is inherited from local_settings (env-var driven, same value).
 
