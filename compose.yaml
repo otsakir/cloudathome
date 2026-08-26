@@ -43,6 +43,10 @@ services:
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
       CAH_SSH_PORT: "${CAH_SSH_PORT}"
       HAPROXY_API_PORT: "${HAPROXY_API_PORT}"
+      # MAX_HOME_COUNT and friends (fleet-size sizing) are intentionally not passed
+      # here -- scripts/generate_fleet_config.py bakes them into
+      # docker/django/fleet_config.json at build time instead. See
+      # tunnels/ssh/manage_home.py's module docstring for why.
     cap_add:
       - NET_ADMIN
     volumes:

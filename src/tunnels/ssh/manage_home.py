@@ -2,6 +2,26 @@
 """
 manage_home.py — privileged tunnel-user management script
 
+Runs privileged operations through subprocess.run(), and shares common
+calculation functions (e.g. port-base math) with the rest of the app via the
+module-level `tunnel_manager` singleton, imported in-process by Django code
+that only needs to read config, not run privileged operations.
+
+Fleet-size constants (MAX_HOME_COUNT and friends -- see Config) are an
+install-time-only decision (see CLAUDE.md): scripts/generate_fleet_config.py
+validates them once against .env and bakes them into
+INSTALLED_FLEET_CONFIG_PATH, a file built into the django image at
+`docker build` time (see django.dockerfile). Config reads that locked file,
+not the process environment. This is deliberate: this script runs as root via
+sudo, invoked by the unprivileged django user's own process
+(ElevatedOperations, in tunnels/services.py); an environment variable is
+something that process could always override per-call (subprocess.run(env=)
+accepts an arbitrary dict), so trusting os.environ for a privileged decision
+like "how many home slots exist" would make root's bounds only as trustworthy
+as django's own environment. A root-owned file baked into the image at build
+time isn't reachable from that process at all. Local dev and the standalone
+pytest suite have no such file and fall back to FLEET_DEFAULTS.
+
 Runs as root (via a tightly scoped sudoers rule). Django's ElevatedOperations
 class invokes it with sudo; nothing else should call it directly.
 
@@ -24,6 +44,7 @@ BandwidthManager
 """
 
 import argparse
+import json
 import re
 import os
 import shutil
@@ -37,9 +58,67 @@ def _run(args, **kwargs):
     return subprocess.run(args, **kwargs)
 
 
+# Fleet-size defaults -- the single copy scripts/generate_fleet_config.py also
+# imports (from this module) for its own .env parsing, so the two never hand-drift
+# apart. Only used as a fallback when INSTALLED_FLEET_CONFIG_PATH doesn't exist
+# (local dev, the standalone pytest suite) -- see the module docstring above.
+FLEET_DEFAULTS = {
+    'MAX_HOME_COUNT': 10,
+    'PORTS_PER_HOME': 10,
+    'PORTS_PER_HOME_RESERVED': 100,
+    'HOME_PORTS_BASE': 2000,
+    'TCP_PUBLIC_PORTS_BASE': 10000,
+    'TCP_PUBLIC_PORTS_PER_HOME': 10,
+}
+
+INSTALLED_FLEET_CONFIG_PATH = '/etc/cloudathome/fleet_config.json'
+
+
+class FleetConfigError(ValueError):
+    """Raised when fleet-size values are missing, non-positive, or mutually
+    inconsistent."""
+
+
+def validate_fleet_config(values):
+    """Raises FleetConfigError if `values` (a dict keyed like FLEET_DEFAULTS) is
+    invalid or internally inconsistent."""
+    for key in FLEET_DEFAULTS:
+        if key not in values:
+            raise FleetConfigError(f'missing fleet config value: {key}')
+        value = values[key]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise FleetConfigError(f'{key} must be a positive integer, got {value!r}')
+
+    if values['PORTS_PER_HOME'] > values['PORTS_PER_HOME_RESERVED']:
+        raise FleetConfigError(
+            f"PORTS_PER_HOME ({values['PORTS_PER_HOME']}) must not exceed "
+            f"PORTS_PER_HOME_RESERVED ({values['PORTS_PER_HOME_RESERVED']}) -- "
+            "otherwise adjacent homes' tunnel port ranges overlap."
+        )
+
+
+def _load_installed_fleet_config():
+    """Reads the fleet-size values locked in at install time by
+    scripts/generate_fleet_config.py (baked into the image -- see
+    django.dockerfile). Returns None if this process wasn't deployed via that
+    install step; callers fall back to FLEET_DEFAULTS in that case.
+    """
+    try:
+        with open(INSTALLED_FLEET_CONFIG_PATH) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+
+
+def _fleet_value(installed, name):
+    return installed[name] if installed is not None else FLEET_DEFAULTS[name]
+
+
+_installed_fleet_config = _load_installed_fleet_config()
+
+
 class Config:
 
-    PORTS_PER_HOME = 10
     SSHD_CONFIGD_PATH = '/etc/ssh/sshd_config.d'
     SSHD_PID = '/var/run/sshd.pid'
     LISTENING_NETWORK_INTERFACE = '*'
@@ -50,12 +129,12 @@ class Config:
     USERNAME_SUFFIX_PATTERN = '[a-z0-9_-]{1,20}'
     USERNAME_PATTERN = f'{HOME_PREFIX}([0-9]){{2}}_{USERNAME_SUFFIX_PATTERN}'
 
-    MAX_HOME_COUNT = 10
-    HOME_PORTS_BASE = 2000
-    PORTS_PER_HOME_RESERVED = 100
-
-    TCP_PUBLIC_PORTS_BASE = 10000
-    TCP_PUBLIC_PORTS_PER_HOME = 10
+    MAX_HOME_COUNT = _fleet_value(_installed_fleet_config, 'MAX_HOME_COUNT')
+    PORTS_PER_HOME = _fleet_value(_installed_fleet_config, 'PORTS_PER_HOME')
+    PORTS_PER_HOME_RESERVED = _fleet_value(_installed_fleet_config, 'PORTS_PER_HOME_RESERVED')
+    HOME_PORTS_BASE = _fleet_value(_installed_fleet_config, 'HOME_PORTS_BASE')
+    TCP_PUBLIC_PORTS_BASE = _fleet_value(_installed_fleet_config, 'TCP_PUBLIC_PORTS_BASE')
+    TCP_PUBLIC_PORTS_PER_HOME = _fleet_value(_installed_fleet_config, 'TCP_PUBLIC_PORTS_PER_HOME')
 
     BANDWIDTH_MIN_KBPS = 100
     BANDWIDTH_MAX_KBPS = 10_000_000

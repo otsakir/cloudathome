@@ -1,1 +1,10 @@
+# Fleet-size constants (MAX_HOME_COUNT and friends, install-time-only, see
+# CLAUDE.md) are NOT passed through env_keep here on purpose: manage_home.py reads
+# them from a root-owned file baked into the image at build time
+# (/etc/cloudathome/fleet_config.json), not from the environment. An env var is
+# something the unprivileged django process could always override per-call
+# (subprocess.run(env=...) accepts an arbitrary dict), so keeping these names would
+# let that process hand root a spoofed MAX_HOME_COUNT/port-range for a
+# security-relevant decision. See manage_home.py's module docstring.
+
 django ALL=(root) NOPASSWD: /usr/local/bin/manage_home.py

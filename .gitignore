@@ -5,3 +5,4 @@ certs
 var
 *.env
 ssh
+/docker/django/fleet_config.json

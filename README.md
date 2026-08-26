@@ -54,6 +54,22 @@ The defaults (`8080-8180` for HTTP, `8443-8543` for HTTPS) work out of the box;
 edit `.env` if you want a different range. Without a `.env` file, `docker compose up`
 fails outright rather than silently skipping the feature.
 
+`.env` also controls this instance's **fleet size** — how many home slots it has
+and how tunnel/public ports are laid out per home (`MAX_HOME_COUNT`,
+`PORTS_PER_HOME`, and friends; defaults to 10 homes). This is an install-time-only
+decision — there's no supported way to change it once homes have registered — so
+decide it now if the defaults don't fit, then generate the derived config once,
+before building:
+
+```bash
+python3 scripts/generate_fleet_config.py
+```
+
+This validates those settings, writes the per-home backend definitions into
+`docker/haproxy/haproxy.cfg`, derives `TCP_PUBLIC_PORT_RANGE` in `.env` from them,
+and writes `docker/django/fleet_config.json`, which the build below bakes into the
+`tunnelagent` image — the build fails if this hasn't been run first.
+
 ```bash
 docker compose -f compose.yaml up --build
 ```
@@ -71,7 +87,7 @@ docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py migrat
 docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
 ```
 
-The `migrate` step also provisions the 10 home slots (indices 0–9) automatically via the data migration `tunnels/migrations/0003_provision_homes.py` — this is a fixed capacity for this instance, not something you configure per deployment.
+The `migrate` step also provisions this instance's home slots automatically via the data migration `tunnels/migrations/0003_provision_homes.py`, sized to whatever `MAX_HOME_COUNT` was set to when you ran `generate_fleet_config.py` above (10 by default) — fixed for the life of this instance, per the fleet-size note above.
 
 The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 

@@ -36,6 +36,15 @@ RUN chmod 700 /usr/local/bin/manage_home.py
 COPY ./docker/django/sudoers.d/tunneling /etc/sudoers.d/
 RUN chmod 440 /etc/sudoers.d/tunneling
 
+# Fleet-size config (MAX_HOME_COUNT and friends), locked at install time by
+# scripts/generate_fleet_config.py -- must have been run against .env before this
+# build (see that script's docstring). Baked into the image, root-owned, so the
+# unprivileged django user can't influence what manage_home.py trusts for these
+# values at runtime -- see manage_home.py's module docstring.
+RUN mkdir -p /etc/cloudathome
+COPY docker/django/fleet_config.json /etc/cloudathome/fleet_config.json
+RUN chmod 644 /etc/cloudathome/fleet_config.json
+
 #COPY . /opt/app # we map django code with 'volumes' in compose.yaml
 
 
