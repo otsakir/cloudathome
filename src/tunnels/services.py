@@ -13,7 +13,7 @@ SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
 HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
 TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
-DEFAULT_SCHEME_PORTS = {'http': 80, 'https': 443}
+DEFAULT_SCHEME_PORTS = {'http': settings.CAH_HTTP_PORT, 'https': settings.CAH_HTTPS_PORT}
 
 
 class HAProxyService:

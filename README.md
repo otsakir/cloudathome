@@ -28,6 +28,13 @@ The defaults (`8080-8180` for HTTP, `8443-8543` for HTTPS) work out of the box;
 edit `.env` if you want a different range. Without a `.env` file, `docker compose up`
 fails outright rather than silently skipping the feature.
 
+`.env` also sets the standard ports this instance listens on (`CAH_HTTP_PORT`/
+`CAH_HTTPS_PORT`, default 80/443; `CAH_API_PORT`, default 8000) — only worth
+changing if you're running more than one CloudAtHome instance on the same host,
+since only one process can bind the real 80/443 at a time. See
+[Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host)
+if that's you.
+
 ### Configure installation capacity
 
 `.env` also controls this instance's **fleet

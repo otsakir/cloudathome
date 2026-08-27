@@ -35,7 +35,8 @@ class ProxyMappingHttpSerializer(serializers.Serializer):
     public_port = serializers.IntegerField(
         required=False, allow_null=True, min_value=1, max_value=65535,
         help_text=(
-            'Public-facing port. Omit to use the standard port (80 for HTTP, 443 for HTTPS); '
+            'Public-facing port. Omit to use this instance\'s standard port for the scheme '
+            '(80 for HTTP, 443 for HTTPS, by default -- operator-configurable); '
             'otherwise must be within the range returned by GET /api/config/inbound-ports/<scheme>/.'
         ),
     )

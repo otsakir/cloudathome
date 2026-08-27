@@ -228,8 +228,9 @@ class ProxyMappingListView(ListAPIView):
             'The scheme is specified as a URL path segment (`http` or `https`). '
             'The hostname must be the base domain or a subdomain of one already registered for this home. '
             'Each scheme may have at most one active mapping per hostname. '
-            'An optional `public_port` selects which port the mapping is published on; omit it to use the '
-            'standard port (80 for HTTP, 443 for HTTPS), or supply a port within the range returned by '
+            'An optional `public_port` selects which port the mapping is published on; omit it to use this '
+            "instance's standard port for the scheme (80 for HTTP, 443 for HTTPS, by default -- "
+            'operator-configurable), or supply a port within the range returned by '
             'GET /api/config/inbound-ports/<scheme>/.'
         ),
         request=ProxyMappingHttpSerializer,
@@ -411,7 +412,8 @@ class ProxyInstanceAPIView(APIView):
     summary='Get the supported inbound port range for a scheme',
     description=(
         'Returns the shared, system-wide port range available for HTTP or HTTPS proxy mappings, '
-        'in addition to the always-available standard port (80 for HTTP, 443 for HTTPS). '
+        'in addition to the always-available standard port for this instance (80 for HTTP, 443 for HTTPS, '
+        'by default -- operator-configurable). '
         'Unlike TCP forwarding, this range is not split per home -- any home may request a mapping '
         'on any port in it, since HTTP/HTTPS mappings are routed by hostname, not port alone.'
     ),

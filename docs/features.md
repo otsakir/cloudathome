@@ -21,7 +21,11 @@ All egress TCP traffic sourced from the home's tunnel port range is marked, then
 
 ## Custom HTTP/HTTPS inbound ports
 
-By default, HTTP/HTTPS proxy mappings publish on the standard port (80/443). The cloud server can also advertise a **shared, system-wide alternate port range** — unlike the TCP range, it's not split per home, since HTTP/HTTPS mappings are routed by hostname (which the cloud already guarantees can't collide across homes), not by port alone. A home requests a custom port via `public_port` when creating a mapping (`POST /api/homes/<slug>/proxy-mappings/<scheme>/`), or discovers what's available via `GET /api/config/inbound-ports/<scheme>/`.
+By default, HTTP/HTTPS proxy mappings publish on this instance's standard port (`CAH_HTTP_PORT`/`CAH_HTTPS_PORT`, `.env` — 80/443 out of the box). The cloud server can also advertise a **shared, system-wide alternate port range** — unlike the TCP range, it's not split per home, since HTTP/HTTPS mappings are routed by hostname (which the cloud already guarantees can't collide across homes), not by port alone. A home requests a custom port via `public_port` when creating a mapping (`POST /api/homes/<slug>/proxy-mappings/<scheme>/`), or discovers what's available via `GET /api/config/inbound-ports/<scheme>/`.
+
+### Running more than one instance on the same host
+
+`CAH_HTTP_PORT`/`CAH_HTTPS_PORT`/`CAH_API_PORT` exist specifically so this repo can be checked out and run more than once on one machine (e.g. staging alongside production, or several community instances). Only one process can ever bind the real `0.0.0.0:80`/`:443` at a time, so every instance past the first needs either its own host IP (then all can keep the 80/443 defaults, bound to different IPs via `compose.yaml`'s port syntax) or its own non-standard port set in `.env`. This only solves *running* multiple instances on one host — it doesn't make several instances share one public IP on the real ports 80/443. That would need something in front of all of them doing its own SNI/Host-based routing to pick which instance's HAProxy handles a given connection — architecturally similar to what HAProxy itself already does one layer down, but not something this repo provides today.
 
 The operator configures the range once, in `.env` (see the main [README](../README.md#deploying-the-cloud-server)):
 

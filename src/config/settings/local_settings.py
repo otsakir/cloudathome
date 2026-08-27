@@ -157,6 +157,15 @@ HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'
 HAPROXY_API_PORT = int(os.environ.get('HAPROXY_API_PORT', '9999'))
 
+# The standard HTTP/HTTPS ports this instance's HAProxy listens on. Configurable
+# (rather than hardcoded 80/443) so more than one CloudAtHome instance can run on
+# the same host -- see CAH_HTTP_PORT/CAH_HTTPS_PORT in .env.example. Used as the
+# default `public_port` when a home omits it on a proxy-mapping request
+# (tunnels.services.DEFAULT_SCHEME_PORTS), so it must always match whatever
+# haproxy.cfg actually binds for this instance.
+CAH_HTTP_PORT = int(os.environ.get('CAH_HTTP_PORT', '80'))
+CAH_HTTPS_PORT = int(os.environ.get('CAH_HTTPS_PORT', '443'))
+
 
 def _parse_port_range(env_var, default):
     lo, hi = os.environ.get(env_var, default).split('-')

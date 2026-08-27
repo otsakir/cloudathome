@@ -6,13 +6,15 @@ services:
     volumes:
       - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     environment:
+      CAH_HTTP_PORT: "${CAH_HTTP_PORT}"
+      CAH_HTTPS_PORT: "${CAH_HTTPS_PORT}"
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
       TCP_PUBLIC_PORT_RANGE: "${TCP_PUBLIC_PORT_RANGE}"
       HAPROXY_API_PORT: "${HAPROXY_API_PORT}"
     ports:
-      - "80:80"
-      - "443:443"
+      - "${CAH_HTTP_PORT}:${CAH_HTTP_PORT}"
+      - "${CAH_HTTPS_PORT}:${CAH_HTTPS_PORT}"
       - "${TCP_PUBLIC_PORT_RANGE}:${TCP_PUBLIC_PORT_RANGE}"
       - "${HTTP_INBOUND_PORT_RANGE}:${HTTP_INBOUND_PORT_RANGE}"
       - "${HTTPS_INBOUND_PORT_RANGE}:${HTTPS_INBOUND_PORT_RANGE}"
@@ -36,9 +38,11 @@ services:
         condition: service_healthy
     ports:
       - "${CAH_SSH_PORT}:22"
-      - 8000:8000
+      - "${CAH_API_PORT}:8000"
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.docker_settings
+      CAH_HTTP_PORT: "${CAH_HTTP_PORT}"
+      CAH_HTTPS_PORT: "${CAH_HTTPS_PORT}"
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
       CAH_SSH_PORT: "${CAH_SSH_PORT}"
