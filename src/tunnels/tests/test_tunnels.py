@@ -2,10 +2,11 @@ import argparse
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from tunnels.models import Home, HomeBaseDomain
+from tunnels.services import BaseDomainService, HAProxyService
 from tunnels.ssh.manage_home import Config, TunnelManager, _build_parser
 import os
 import shutil
@@ -154,3 +155,51 @@ class RevokeTokenViewTest(TestCase):
 
         retry = self.client.get('/api/homes/')
         self.assertEqual(retry.status_code, 401)
+
+
+class BaseDomainServiceAdminHostnameGuardTest(TestCase):
+    """CAH_HOSTNAME (see settings.py) is reserved -- a home must not be able to
+    register it, or a domain that overlaps it, as a base domain."""
+
+    @override_settings(CAH_HOSTNAME='cloud.example.com')
+    def test_exact_match_is_rejected(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('cloud.example.com')
+
+    @override_settings(CAH_HOSTNAME='cloud.example.com')
+    def test_subdomain_of_admin_hostname_is_rejected(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('sub.cloud.example.com')
+
+    @override_settings(CAH_HOSTNAME='sub.cloud.example.com')
+    def test_parent_of_admin_hostname_is_rejected(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('cloud.example.com')
+
+    @override_settings(CAH_HOSTNAME='cloud.example.com')
+    def test_unrelated_domain_is_accepted(self):
+        self.assertEqual(BaseDomainService.validate('myhome.example.com'), 'myhome.example.com')
+
+    @override_settings(CAH_HOSTNAME=None)
+    def test_no_admin_hostname_configured_imposes_no_restriction(self):
+        self.assertEqual(BaseDomainService.validate('cloud.example.com'), 'cloud.example.com')
+
+
+class EnsureAdminRouteTest(TestCase):
+    """HAProxyService.ensure_admin_route (run at container start via
+    manage.py reconcile_admin_route) seeds the static map entry only when
+    CAH_HOSTNAME is configured."""
+
+    @override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80)
+    @patch('tunnels.services.HAProxyService._send_command')
+    def test_seeds_map_entry_when_configured(self, mock_send):
+        HAProxyService.ensure_admin_route()
+        mock_send.assert_called_once_with(
+            'add map /usr/local/etc/haproxy/maps/host_http_backends.map cloud.example.com:80 cah_django_backend'
+        )
+
+    @override_settings(CAH_HOSTNAME=None)
+    @patch('tunnels.services.HAProxyService._send_command')
+    def test_no_op_when_unconfigured(self, mock_send):
+        HAProxyService.ensure_admin_route()
+        mock_send.assert_not_called()

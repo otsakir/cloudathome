@@ -16,6 +16,10 @@ su-exec django python /opt/app/manage.py reconcile_tunnel_users
 # re-apply bandwidth limits from the database (tc rules are lost on container restart)
 su-exec django python /opt/app/manage.py reconcile_bandwidth
 
+# re-seed the static admin-route map entry (a no-op unless CAH_HOSTNAME is set;
+# HAProxy's map files are wiped on every restart, same as home mappings)
+su-exec django python /opt/app/manage.py reconcile_admin_route
+
 # run django
 su-exec django /opt/app/manage.py runserver 0.0.0.0:8000 &
 

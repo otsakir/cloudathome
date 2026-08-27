@@ -33,7 +33,9 @@ fails outright rather than silently skipping the feature.
 changing if you're running more than one CloudAtHome instance on the same host,
 since only one process can bind the real 80/443 at a time. See
 [Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host)
-if that's you.
+if that's you. There's also an optional `CAH_HOSTNAME` to route Django's
+admin/API through HAProxy instead of `CAH_API_PORT` — see
+[Routing Django's admin/API through HAProxy](docs/features.md#routing-djangos-adminapi-through-haproxy).
 
 ### Configure installation capacity
 

@@ -13,6 +13,11 @@ SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
 HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
 TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
+# Fixed backend (declared in haproxy.cfg, not per-home generated) that fronts
+# this instance's own Django. See settings.CAH_HOSTNAME and
+# tunnels.management.commands.reconcile_admin_route.
+ADMIN_BACKEND = 'cah_django_backend'
+
 DEFAULT_SCHEME_PORTS = {'http': settings.CAH_HTTP_PORT, 'https': settings.CAH_HTTPS_PORT}
 
 
@@ -51,6 +56,16 @@ class HAProxyService:
     @classmethod
     def remove_tcp_mapping(cls, public_port: int):
         cls._send_command(f'del map {TCP_MAP_FILE} {public_port}')
+
+    @classmethod
+    def ensure_admin_route(cls):
+        """Seed the static map entry routing settings.CAH_HOSTNAME to Django's
+        backend, if CAH_HOSTNAME is configured. No-op otherwise. Called at
+        container start (see reconcile_admin_route) since map files start empty
+        on every restart -- not something a home ever registers or removes."""
+        if not settings.CAH_HOSTNAME:
+            return
+        cls._send_command(f'add map {HTTP_MAP_FILE} {settings.CAH_HOSTNAME}:{settings.CAH_HTTP_PORT} {ADMIN_BACKEND}')
 
     @classmethod
     def dump_mappings(cls):
@@ -147,6 +162,10 @@ class BaseDomainService:
         ext = tldextract.extract(domain)
         if not ext.domain or not ext.suffix:
             raise ValueError(f"'{domain}' is not a registrable domain")
+
+        admin_hostname = settings.CAH_HOSTNAME
+        if admin_hostname and (domain == admin_hostname or domain.endswith('.' + admin_hostname) or admin_hostname.endswith('.' + domain)):
+            raise ValueError(f"'{domain}' is reserved for this cloud server's own admin/API access")
 
         qs = HomeBaseDomain.objects.all()
         if exclude_home is not None:

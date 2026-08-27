@@ -166,6 +166,16 @@ HAPROXY_API_PORT = int(os.environ.get('HAPROXY_API_PORT', '9999'))
 CAH_HTTP_PORT = int(os.environ.get('CAH_HTTP_PORT', '80'))
 CAH_HTTPS_PORT = int(os.environ.get('CAH_HTTPS_PORT', '443'))
 
+# Optional hostname this instance's own Django (admin/API/web UI) answers on,
+# routed through HAProxy's existing Host-based map (see
+# tunnels.management.commands.reconcile_admin_route) instead of a separate
+# published port -- lets an operator close CAH_API_PORT and expose only
+# CAH_HTTP_PORT/CAH_HTTPS_PORT. Unset (the default) leaves this feature off;
+# Django stays reachable only via CAH_API_PORT, same as before. HTTP only for
+# now -- see docs/features.md for why HTTPS isn't wired up yet. Reserved
+# against home base-domain collisions in BaseDomainService.validate.
+CAH_HOSTNAME = os.environ.get('CAH_HOSTNAME', '').strip().lower() or None
+
 
 def _parse_port_range(env_var, default):
     lo, hi = os.environ.get(env_var, default).split('-')
