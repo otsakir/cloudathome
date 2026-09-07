@@ -25,10 +25,8 @@ cp .env.example .env
 ```
 
 By default, both Django (website/API) and homes' public endpoints listen on
-ports 80/443. Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` (this instance's own
-port, and `CAH_HOSTNAME`'s below) or `HTTP_INBOUND_DEFAULT_PORT`/
-`HTTPS_INBOUND_DEFAULT_PORT` (what a home's mapping defaults to) independently
-if you need to. This is also how you run more than one CloudAtHome instance
+ports 80/443. Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` or `HTTP_INBOUND_DEFAULT_PORT`/
+`HTTPS_INBOUND_DEFAULT_PORT`. This is also how you run more than one CloudAtHome instance
 on the same host — see
 [Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host)
 for more on this.
@@ -51,11 +49,10 @@ for the full picture.
 
 ### Configure installation capacity
 
-`.env` also controls this instance's **fleet
-size** — how many home slots it has and how tunnel/public ports are laid out
-per home (`MAX_HOME_COUNT`, `PORTS_PER_HOME`, and friends; defaults to 10
-homes). This is an install-time-only decision — there's no supported way to
-change it once homes have registered — so decide it now if the defaults don't
+Next, configure the instance capacity. The number of homes allowed to register and the number
+of proxied ports per home (`MAX_HOME_COUNT`, `PORTS_PER_HOME`, and friends; defaults to 10
+homes). **This is an install-time-only decision — there's no supported way to
+change it once homes have registered** — so decide it now if the defaults don't
 fit, then lock it in:
 
 ```bash
@@ -66,6 +63,8 @@ This validates those settings, writes the per-home backend definitions into
 `docker/haproxy/haproxy.cfg`, derives `TCP_PUBLIC_PORT_RANGE` in `.env` from them,
 and writes `docker/django/fleet_config.json`, which the build below bakes into the
 `tunnelagent` image — the build fails if this hasn't been run first.
+
+_In case you have already initialized the instance, you will need to reset it by removing `src/var/db.sqlite3` first._
 
 ### Build and start the stack
 
