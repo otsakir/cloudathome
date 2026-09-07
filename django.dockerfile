@@ -36,6 +36,12 @@ RUN chmod -R 700 /var/tunnelagent
 # manually.
 RUN mkdir -p /etc/cloudathome/certs && chown -R django:django /etc/cloudathome/certs
 
+# collectstatic's output (settings.STATIC_ROOT, docker_settings.py), served by
+# WhiteNoise. Deliberately outside /opt/app -- that's the ./src bind mount
+# (compose.yaml), owned by the host user; collectstatic (run as django, every
+# container start via entrypoint.sh) can't create directories there.
+RUN mkdir -p /opt/static && chown -R django:django /opt/static
+
 # tunnel users management scripts
 COPY src/tunnels/ssh/manage_home.py /usr/local/bin/
 RUN chmod 700 /usr/local/bin/manage_home.py

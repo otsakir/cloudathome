@@ -21,6 +21,12 @@ su-exec django python /opt/app/manage.py reconcile_bandwidth
 # HAProxy's map files are wiped on every restart, same as home mappings)
 su-exec django python /opt/app/manage.py reconcile_admin_route
 
+# --noinput: collectstatic otherwise prompts for confirmation whenever the
+# destination (settings.STATIC_ROOT, /opt/static -- see django.dockerfile)
+# already has files, which it will on every restart of an existing (not
+# recreated) container -- would hang here forever waiting on stdin.
+su-exec django python /opt/app/manage.py collectstatic --noinput
+
 # run django under gunicorn -- one plain-HTTP process always, one HTTPS
 # process only if a cert/key has been supplied (see compose.yaml's certs bind
 # mount) -- their mere presence is the toggle, no separate setting. Same fixed

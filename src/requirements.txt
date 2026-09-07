@@ -13,3 +13,4 @@ requests-file==3.0.1
 tldextract==5.1.3
 typing_extensions==4.15.0
 PyYAML==6.0.2
+whitenoise==6.12.0
