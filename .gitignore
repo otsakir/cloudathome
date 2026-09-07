@@ -1,7 +1,11 @@
 .idea
 __pycache__/
 *.pyc
-certs
+# Operator-supplied TLS cert/key for gunicorn (CAH_HOSTNAME's HTTPS route) --
+# see compose.yaml's certs bind mount and docker/django/entrypoint.sh. The
+# directory itself stays tracked (see its README) so it exists on a fresh
+# checkout; only the actual cert/key files are ignored.
+/docker/django/certs/*.pem
 var
 *.env
 ssh

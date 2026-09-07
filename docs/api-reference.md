@@ -1,10 +1,6 @@
 # REST API reference
 
-This is the contract the home-side client (`cah.py` / Home Console) talks to — useful if you're debugging a home's connection, writing an alternative client, or just want the full picture. It's also browsable interactively when running in debug mode:
-
-- Swagger UI: `http://localhost:8000/api/schema/swagger/`
-- ReDoc: `http://localhost:8000/api/schema/redoc/`
-- OpenAPI schema: `http://localhost:8000/api/schema/`
+This is the contract the home-side client (`cah.py` / Home Console) talks to — useful if you're debugging a home's connection, writing an alternative client, or just want the full picture. It's also browsable interactively when running in debug mode, at `/api/schema/swagger/`, `/api/schema/redoc/`, and `/api/schema/` — in local, non-Docker dev that's `http://localhost:8000/api/schema/swagger/` (`manage.py runserver`); on a deployed instance it's `http://<CAH_HOSTNAME>/api/schema/swagger/`, since Django has no published port of its own (see [Routing Django's admin/API through HAProxy](features.md#routing-djangos-adminapi-through-haproxy)).
 
 ### Home endpoints
 

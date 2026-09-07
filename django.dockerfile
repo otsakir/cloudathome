@@ -30,6 +30,12 @@ RUN mkdir -p /var/tunnelagent/public_keys
 RUN chown -R django:django /var/tunnelagent
 RUN chmod -R 700 /var/tunnelagent
 
+# Mount point for the operator-supplied TLS cert/key gunicorn terminates
+# CAH_HOSTNAME's HTTPS with (see compose.yaml's certs bind mount and
+# docker/django/entrypoint.sh) -- no ACME automation, files are placed here
+# manually.
+RUN mkdir -p /etc/cloudathome/certs && chown -R django:django /etc/cloudathome/certs
+
 # tunnel users management scripts
 COPY src/tunnels/ssh/manage_home.py /usr/local/bin/
 RUN chmod 700 /usr/local/bin/manage_home.py

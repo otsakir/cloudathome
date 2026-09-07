@@ -159,22 +159,30 @@ HAPROXY_API_PORT = int(os.environ.get('HAPROXY_API_PORT', '9999'))
 
 # The standard HTTP/HTTPS ports this instance's HAProxy listens on. Configurable
 # (rather than hardcoded 80/443) so more than one CloudAtHome instance can run on
-# the same host -- see CAH_HTTP_PORT/CAH_HTTPS_PORT in .env.example. Used as the
-# default `public_port` when a home omits it on a proxy-mapping request
-# (tunnels.services.DEFAULT_SCHEME_PORTS), so it must always match whatever
-# haproxy.cfg actually binds for this instance.
+# the same host -- see CAH_HTTP_PORT/CAH_HTTPS_PORT in .env.example. Also the
+# port CAH_HOSTNAME (below) itself is reached on, so it must always match
+# whatever haproxy.cfg actually binds for this instance.
 CAH_HTTP_PORT = int(os.environ.get('CAH_HTTP_PORT', '80'))
 CAH_HTTPS_PORT = int(os.environ.get('CAH_HTTPS_PORT', '443'))
 
-# Optional hostname this instance's own Django (admin/API/web UI) answers on,
-# routed through HAProxy's existing Host-based map (see
-# tunnels.management.commands.reconcile_admin_route) instead of a separate
-# published port -- lets an operator close CAH_API_PORT and expose only
-# CAH_HTTP_PORT/CAH_HTTPS_PORT. Unset (the default) leaves this feature off;
-# Django stays reachable only via CAH_API_PORT, same as before. HTTP only for
-# now -- see docs/features.md for why HTTPS isn't wired up yet. Reserved
-# against home base-domain collisions in BaseDomainService.validate.
+# Required (in the docker-composed stack -- see reconcile_admin_route) hostname
+# this instance's own Django (admin/API/web UI) answers on, routed through
+# HAProxy's existing Host/SNI-based maps (see
+# tunnels.management.commands.reconcile_admin_route) -- the only way to reach
+# Django, there's no separate published port. Reachable over both HTTP and
+# HTTPS, at CAH_HTTP_PORT/CAH_HTTPS_PORT, since Django terminates its own HTTPS
+# via gunicorn (see docker/django/entrypoint.sh). Left unset here for local,
+# non-Docker dev (manage.py runserver), where this whole mechanism doesn't
+# apply. Reserved against home base-domain collisions in
+# BaseDomainService.validate.
 CAH_HOSTNAME = os.environ.get('CAH_HOSTNAME', '').strip().lower() or None
+
+# Django rejects any request whose Host header isn't in ALLOWED_HOSTS
+# regardless of DEBUG, so CAH_HOSTNAME must be added here -- otherwise every
+# request routed to it through HAProxy 400s with DisallowedHost before ever
+# reaching a view.
+if CAH_HOSTNAME:
+    ALLOWED_HOSTS.append(CAH_HOSTNAME)
 
 
 def _parse_port_range(env_var, default):
@@ -184,6 +192,23 @@ def _parse_port_range(env_var, default):
 
 HTTP_INBOUND_PORT_RANGE = _parse_port_range('HTTP_INBOUND_PORT_RANGE', '8080-8180')
 HTTPS_INBOUND_PORT_RANGE = _parse_port_range('HTTPS_INBOUND_PORT_RANGE', '8443-8543')
+
+# The default `public_port` a home's HTTP/HTTPS mapping gets when it omits one
+# (tunnels.services.DEFAULT_SCHEME_PORTS) -- independent of CAH_HTTP_PORT/
+# CAH_HTTPS_PORT above, which are this instance's own standard port (and
+# CAH_HOSTNAME's). The two happen to coincide by default, but don't have to:
+# e.g. an operator running a second instance on the same host might move
+# CAH_HTTP_PORT to a non-standard value for that reason alone, while still
+# wanting homes to default to public_port 80 -- these being separate settings
+# means that no longer drags the home-mapping default along with it. Gets its
+# own haproxy.cfg bind line (HTTP_INBOUND_DEFAULT_PORT/HTTPS_INBOUND_DEFAULT_PORT),
+# so it doesn't need to land on an already-bound port either -- HAProxy enables
+# SO_REUSEPORT on its listeners by default, so bind lines are free to overlap
+# in value with CAH_HTTP_PORT/CAH_HTTPS_PORT or with the inbound range below
+# without conflict (verified: see haproxy_frontend_ports_and_reload notes in
+# the project docs/memory).
+HTTP_INBOUND_DEFAULT_PORT = int(os.environ.get('HTTP_INBOUND_DEFAULT_PORT') or CAH_HTTP_PORT)
+HTTPS_INBOUND_DEFAULT_PORT = int(os.environ.get('HTTPS_INBOUND_DEFAULT_PORT') or CAH_HTTPS_PORT)
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/home/dashboard/'

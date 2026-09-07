@@ -1,6 +1,7 @@
 asgiref==3.10.0
 requests==2.32.3
 Django==5.2.7
+gunicorn==23.0.0
 django-autoslug==1.9.9
 django-filter==25.2
 djangorestframework==3.16.1

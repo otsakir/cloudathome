@@ -8,6 +8,8 @@ services:
     environment:
       CAH_HTTP_PORT: "${CAH_HTTP_PORT}"
       CAH_HTTPS_PORT: "${CAH_HTTPS_PORT}"
+      HTTP_INBOUND_DEFAULT_PORT: "${HTTP_INBOUND_DEFAULT_PORT}"
+      HTTPS_INBOUND_DEFAULT_PORT: "${HTTPS_INBOUND_DEFAULT_PORT}"
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
       TCP_PUBLIC_PORT_RANGE: "${TCP_PUBLIC_PORT_RANGE}"
@@ -15,6 +17,8 @@ services:
     ports:
       - "${CAH_HTTP_PORT}:${CAH_HTTP_PORT}"
       - "${CAH_HTTPS_PORT}:${CAH_HTTPS_PORT}"
+      - "${HTTP_INBOUND_DEFAULT_PORT}:${HTTP_INBOUND_DEFAULT_PORT}"
+      - "${HTTPS_INBOUND_DEFAULT_PORT}:${HTTPS_INBOUND_DEFAULT_PORT}"
       - "${TCP_PUBLIC_PORT_RANGE}:${TCP_PUBLIC_PORT_RANGE}"
       - "${HTTP_INBOUND_PORT_RANGE}:${HTTP_INBOUND_PORT_RANGE}"
       - "${HTTPS_INBOUND_PORT_RANGE}:${HTTPS_INBOUND_PORT_RANGE}"
@@ -38,12 +42,13 @@ services:
         condition: service_healthy
     ports:
       - "${CAH_SSH_PORT}:22"
-      - "${CAH_API_PORT}:8000"
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.docker_settings
       CAH_HTTP_PORT: "${CAH_HTTP_PORT}"
       CAH_HTTPS_PORT: "${CAH_HTTPS_PORT}"
       CAH_HOSTNAME: "${CAH_HOSTNAME}"
+      HTTP_INBOUND_DEFAULT_PORT: "${HTTP_INBOUND_DEFAULT_PORT}"
+      HTTPS_INBOUND_DEFAULT_PORT: "${HTTPS_INBOUND_DEFAULT_PORT}"
       HTTP_INBOUND_PORT_RANGE: "${HTTP_INBOUND_PORT_RANGE}"
       HTTPS_INBOUND_PORT_RANGE: "${HTTPS_INBOUND_PORT_RANGE}"
       CAH_SSH_PORT: "${CAH_SSH_PORT}"
@@ -57,6 +62,10 @@ services:
     volumes:
       - ./src:/opt/app
       - ./src/var:/opt/backend-var
+      # Operator-supplied TLS cert/key gunicorn terminates CAH_HOSTNAME's HTTPS
+      # with (fullchain.pem/privkey.pem) -- no ACME automation, drop files here
+      # manually. Only reachable via HAProxy, never published directly.
+      - ./docker/django/certs:/etc/cloudathome/certs:ro
 
 #  proxyagent:
 #    build:

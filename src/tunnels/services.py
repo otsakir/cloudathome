@@ -13,12 +13,26 @@ SNI_MAP_FILE = '/usr/local/etc/haproxy/maps/sni_backends.map'
 HTTP_MAP_FILE = '/usr/local/etc/haproxy/maps/host_http_backends.map'
 TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
-# Fixed backend (declared in haproxy.cfg, not per-home generated) that fronts
+# Fixed backends (declared in haproxy.cfg, not per-home generated) that front
 # this instance's own Django. See settings.CAH_HOSTNAME and
 # tunnels.management.commands.reconcile_admin_route.
-ADMIN_BACKEND = 'cah_django_backend'
+ADMIN_HTTP_BACKEND = 'cah_django_http_backend'
+ADMIN_HTTP_REDIRECT_BACKEND = 'cah_django_http_redirect_backend'
+ADMIN_HTTPS_BACKEND = 'cah_django_https_backend'
 
-DEFAULT_SCHEME_PORTS = {'http': settings.CAH_HTTP_PORT, 'https': settings.CAH_HTTPS_PORT}
+# Operator-supplied TLS cert/key gunicorn terminates CAH_HOSTNAME's HTTPS with
+# (see docker/django/entrypoint.sh, docker/django/certs/README.md). Fixed
+# paths, not settings-configurable -- the compose bind mount is how an
+# operator supplies/rotates them. Their mere presence is the only toggle for
+# Django's HTTPS entrypoint: no separate on/off setting.
+TLS_CERT_FILE = '/etc/cloudathome/certs/fullchain.pem'
+TLS_KEY_FILE = '/etc/cloudathome/certs/privkey.pem'
+
+# Default `public_port` a home's mapping gets when it omits one -- independent
+# of settings.CAH_HTTP_PORT/CAH_HTTPS_PORT (this instance's own standard port,
+# used by CAH_HOSTNAME's own route). See HTTP_INBOUND_DEFAULT_PORT/
+# HTTPS_INBOUND_DEFAULT_PORT in local_settings.py for why these are separate.
+DEFAULT_SCHEME_PORTS = {'http': settings.HTTP_INBOUND_DEFAULT_PORT, 'https': settings.HTTPS_INBOUND_DEFAULT_PORT}
 
 
 class HAProxyService:
@@ -58,14 +72,54 @@ class HAProxyService:
         cls._send_command(f'del map {TCP_MAP_FILE} {public_port}')
 
     @classmethod
+    def https_available(cls):
+        """Whether gunicorn's HTTPS process has a cert/key to terminate
+        CAH_HOSTNAME's HTTPS with. The sole toggle for Django's HTTPS
+        entrypoint -- docker/django/entrypoint.sh makes the same check
+        independently (same fixed paths) to decide whether to launch that
+        gunicorn process at all, so the two can never disagree."""
+        return Path(TLS_CERT_FILE).is_file() and Path(TLS_KEY_FILE).is_file()
+
+    @classmethod
     def ensure_admin_route(cls):
-        """Seed the static map entry routing settings.CAH_HOSTNAME to Django's
-        backend, if CAH_HOSTNAME is configured. No-op otherwise. Called at
+        """Seed the static map entries routing settings.CAH_HOSTNAME to Django's
+        backend(s), if CAH_HOSTNAME is configured. No-op otherwise. Called at
         container start (see reconcile_admin_route) since map files start empty
-        on every restart -- not something a home ever registers or removes."""
+        on every restart -- not something a home ever registers or removes.
+        Uses the instance's standard CAH_HTTP_PORT/CAH_HTTPS_PORT directly --
+        Django is never placed in the inbound ranges, those are for homes' own
+        mappings only.
+
+        Whether HTTPS is wired up at all depends on https_available(): if a
+        cert is present, the HTTP entry redirects to HTTPS instead of proxying
+        to Django directly, and the HTTPS entry is seeded; if not, HTTP proxies
+        straight through and no HTTPS entry exists. Returns a dict describing
+        what was seeded, for the caller to report at startup.
+
+        del-then-add for both entries, unconditionally, rather than a bare
+        "add map": HAProxy's map files normally start empty on every restart
+        (this whole method exists because of that), but that's only true when
+        the haproxy container itself restarts. Restarting just tunnelagent --
+        e.g. after dropping a cert in without touching haproxy -- re-runs this
+        against an already-populated map, where "add map" would leave a stale
+        duplicate entry for the same key (and, since a map's first match wins,
+        the *old* value) instead of replacing it. "del map" on a key that
+        isn't present is a harmless no-op."""
         if not settings.CAH_HOSTNAME:
-            return
-        cls._send_command(f'add map {HTTP_MAP_FILE} {settings.CAH_HOSTNAME}:{settings.CAH_HTTP_PORT} {ADMIN_BACKEND}')
+            return None
+        https_enabled = cls.https_available()
+        http_key = f'{settings.CAH_HOSTNAME}:{settings.CAH_HTTP_PORT}'
+        https_key = f'{settings.CAH_HOSTNAME}:{settings.CAH_HTTPS_PORT}'
+        http_backend = ADMIN_HTTP_REDIRECT_BACKEND if https_enabled else ADMIN_HTTP_BACKEND
+
+        cls._send_command(f'del map {HTTP_MAP_FILE} {http_key}')
+        cls._send_command(f'add map {HTTP_MAP_FILE} {http_key} {http_backend}')
+
+        cls._send_command(f'del map {SNI_MAP_FILE} {https_key}')
+        if https_enabled:
+            cls._send_command(f'add map {SNI_MAP_FILE} {https_key} {ADMIN_HTTPS_BACKEND}')
+
+        return {'https_enabled': https_enabled}
 
     @classmethod
     def dump_mappings(cls):

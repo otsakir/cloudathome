@@ -24,18 +24,30 @@ To deploy and run the cloud server for the first time, follow the four steps bel
 cp .env.example .env
 ```
 
-The defaults (`8080-8180` for HTTP, `8443-8543` for HTTPS) work out of the box;
-edit `.env` if you want a different range. Without a `.env` file, `docker compose up`
-fails outright rather than silently skipping the feature.
-
-`.env` also sets the standard ports this instance listens on (`CAH_HTTP_PORT`/
-`CAH_HTTPS_PORT`, default 80/443; `CAH_API_PORT`, default 8000) — only worth
-changing if you're running more than one CloudAtHome instance on the same host,
-since only one process can bind the real 80/443 at a time. See
+By default, both Django (website/API) and homes' public endpoints listen on
+ports 80/443. Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` (this instance's own
+port, and `CAH_HOSTNAME`'s below) or `HTTP_INBOUND_DEFAULT_PORT`/
+`HTTPS_INBOUND_DEFAULT_PORT` (what a home's mapping defaults to) independently
+if you need to. This is also how you run more than one CloudAtHome instance
+on the same host — see
 [Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host)
-if that's you. There's also an optional `CAH_HOSTNAME` to route Django's
-admin/API through HAProxy instead of `CAH_API_PORT` — see
-[Routing Django's admin/API through HAProxy](docs/features.md#routing-djangos-adminapi-through-haproxy).
+for more on this.
+
+**Two more things matter before you're actually done**:
+
+1. Set `CAH_HOSTNAME` in `.env` to a real hostname you control — this is the
+   only way to reach Django (admin/API/web UI); `tunnelagent` refuses to
+   **start at all** without it.
+2. Drop a TLS cert/key pair at `docker/django/certs/fullchain.pem` and
+   `docker/django/certs/privkey.pem` — gunicorn terminates `CAH_HOSTNAME`'s
+   HTTPS with these (no ACME automation; see
+   [docker/django/certs/README.md](docker/django/certs/README.md) for where
+   to get one, including a self-signed option for local testing). Unlike
+   `CAH_HOSTNAME`, this one doesn't block startup — without it, Django stays
+   reachable over plain HTTP, just without HTTPS.
+
+See [Routing Django's admin/API through HAProxy](docs/features.md#routing-djangos-adminapi-through-haproxy)
+for the full picture.
 
 ### Configure installation capacity
 
@@ -63,7 +75,7 @@ docker compose -f compose.yaml up --build
 
 This starts two containers:
 - **haproxy** — listens on ports 80 and 443 (HTTP/HTTPS), the alternate HTTP/HTTPS range from `.env`, and 10000–10099 (TCP forwards)
-- **tunnelagent** — Django API on port 8000, SSH server on port 8022
+- **tunnelagent** — Django (reachable only through HAProxy, at `CAH_HOSTNAME` — see below), SSH server on port 8022
 
 HAProxy must pass its health check before `tunnelagent` starts.
 
@@ -80,11 +92,11 @@ The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 
 Steps 1, 2, and 4 only apply to a fresh checkout — restarting an existing instance is just `docker compose -f compose.yaml up`.
 
-Once running:
+Once running (substituting your `CAH_HOSTNAME`):
 
 ```commandline
-Swagger UI:        http://localhost:8000/api/schema/swagger/
-Django admin:       http://localhost:8000/admin/login/
+Swagger UI:        http://<CAH_HOSTNAME>/api/schema/swagger/
+Django admin:       http://<CAH_HOSTNAME>/admin/login/
 ```
 
 Want to confirm it all actually works before pointing a real home at it? See [Testing your deployment locally](docs/local-smoke-test.md).
@@ -94,9 +106,9 @@ Want to confirm it all actually works before pointing a real home at it? See [Te
 
 ### Approving a new home operator
 
-Anyone can self-register at `http://<cloud-host>:8000/signup/`, but new accounts are created **inactive** — as the administrator, you're the one who unlocks them:
+Anyone can self-register at `http://<CAH_HOSTNAME>/signup/`, but new accounts are created **inactive** — as the administrator, you're the one who unlocks them:
 
-1. Go to the Django admin at `http://<cloud-host>:8000/admin/`.
+1. Go to the Django admin at `http://<CAH_HOSTNAME>/admin/`.
 2. Open the new user, tick **Active**, and save.
 
 That's the entire admin-side involvement in onboarding. From here the home operator logs into their own dashboard, generates their own API token, and takes it to their own machine to run `cah.py register` — all of that happens on their side, in `cloudathome-client`, not yours.
