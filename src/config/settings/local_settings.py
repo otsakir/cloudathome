@@ -184,6 +184,16 @@ CAH_HOSTNAME = os.environ.get('CAH_HOSTNAME', '').strip().lower() or None
 if CAH_HOSTNAME:
     ALLOWED_HOSTS.append(CAH_HOSTNAME)
 
+# Dev/testing-only escape hatch: lets a home register a base domain that
+# isn't a real registrable domain (BaseDomainService.validate normally
+# requires one recognized by the Public Suffix List, via tldextract) --
+# e.g. 'localhost', 'myapp.local', 'myapp.test'. Only relaxes that one
+# check -- the CAH_HOSTNAME reservation and the overlap checks between
+# homes' own domains still apply unconditionally either way. Default off;
+# never enable this on a real deployment; a syntactically-invalid string
+# is still rejected.
+BASE_DOMAIN_ALLOW_NON_REGISTRABLE = os.environ.get('BASE_DOMAIN_ALLOW_NON_REGISTRABLE', '').strip().lower() in ('1', 'true', 'yes')
+
 
 def _parse_port_range(env_var, default):
     lo, hi = os.environ.get(env_var, default).split('-')

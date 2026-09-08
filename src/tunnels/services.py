@@ -205,17 +205,36 @@ class HAProxyService:
         return result
 
 
+# Bare hostname-syntax check used only when settings.BASE_DOMAIN_ALLOW_NON_REGISTRABLE
+# is on, in place of the real-registrable-domain (Public Suffix List) check below --
+# still rejects garbage, just not "must have a suffix ICANN recognizes".
+_HOSTNAME_LABEL = r'[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?'
+HOSTNAME_RE = re.compile(rf'^{_HOSTNAME_LABEL}(\.{_HOSTNAME_LABEL})*$')
+
+
 class BaseDomainService:
 
     @staticmethod
     def validate(domain: str, exclude_home=None):
-        """Validate a candidate base domain and raise ValueError on any violation."""
+        """Validate a candidate base domain and raise ValueError on any violation.
+
+        Normally a domain must be real and registrable (recognized by the
+        Public Suffix List, via tldextract) -- e.g. 'myhome.example.com', not
+        'localhost' or 'myapp.local'. settings.BASE_DOMAIN_ALLOW_NON_REGISTRABLE
+        relaxes only this one check, for local/dev use -- the CAH_HOSTNAME
+        reservation and the overlap checks against other homes' domains below
+        still apply unconditionally either way.
+        """
         from tunnels.models import HomeBaseDomain
 
         domain = domain.strip().lower()
-        ext = tldextract.extract(domain)
-        if not ext.domain or not ext.suffix:
-            raise ValueError(f"'{domain}' is not a registrable domain")
+        if settings.BASE_DOMAIN_ALLOW_NON_REGISTRABLE:
+            if not HOSTNAME_RE.match(domain):
+                raise ValueError(f"'{domain}' is not a valid hostname")
+        else:
+            ext = tldextract.extract(domain)
+            if not ext.domain or not ext.suffix:
+                raise ValueError(f"'{domain}' is not a registrable domain")
 
         admin_hostname = settings.CAH_HOSTNAME
         if admin_hostname and (domain == admin_hostname or domain.endswith('.' + admin_hostname) or admin_hostname.endswith('.' + domain)):

@@ -188,6 +188,32 @@ class BaseDomainServiceAdminHostnameGuardTest(TestCase):
         self.assertEqual(BaseDomainService.validate('cloud.example.com'), 'cloud.example.com')
 
 
+class BaseDomainServiceRegistrabilityTest(TestCase):
+    """By default a base domain must be real and registrable (Public Suffix
+    List, via tldextract). settings.BASE_DOMAIN_ALLOW_NON_REGISTRABLE relaxes
+    only that check, for local/dev use -- everything else (CAH_HOSTNAME
+    reservation, overlap between homes) still applies regardless."""
+
+    def test_non_registrable_domain_rejected_by_default(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('localhost')
+
+    @override_settings(BASE_DOMAIN_ALLOW_NON_REGISTRABLE=True)
+    def test_non_registrable_domain_accepted_when_relaxed(self):
+        self.assertEqual(BaseDomainService.validate('localhost'), 'localhost')
+        self.assertEqual(BaseDomainService.validate('myapp.local'), 'myapp.local')
+
+    @override_settings(BASE_DOMAIN_ALLOW_NON_REGISTRABLE=True)
+    def test_garbage_still_rejected_when_relaxed(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('not a hostname!')
+
+    @override_settings(BASE_DOMAIN_ALLOW_NON_REGISTRABLE=True, CAH_HOSTNAME='localhost')
+    def test_admin_hostname_reservation_still_applies_when_relaxed(self):
+        with self.assertRaises(ValueError):
+            BaseDomainService.validate('localhost')
+
+
 class EnsureAdminRouteTest(TestCase):
     """HAProxyService.ensure_admin_route (run at container start via
     manage.py reconcile_admin_route) seeds the static map entries when

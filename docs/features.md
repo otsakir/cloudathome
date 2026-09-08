@@ -6,6 +6,8 @@ Most of what's below is home-operator self-service via the API/Home Console — 
 
 Before creating any HTTP/HTTPS proxy entry, a home must register at least one base domain with the cloud server. A base domain is a domain the operator controls in DNS — the cloud enforces that no two homes can claim the same domain or overlapping domains (e.g. if Home A owns `example.com`, Home B cannot register `sub.example.com`), and validates that it's a proper registrable domain (not a bare TLD like `com` or a public suffix like `co.uk`) using the Public Suffix List. Subdomains do not need to be registered separately — once `example.com` is registered, the home can freely create proxy entries for `blog.example.com`, `api.example.com`, etc.
 
+For local/dev use, `BASE_DOMAIN_ALLOW_NON_REGISTRABLE=true` (`.env`) relaxes just the registrable-domain check, so things like `localhost` or `myapp.local` become valid base domains too — the overlap checks between homes and the `CAH_HOSTNAME` reservation still apply exactly as before. Never enable this on a real deployment.
+
 ## Bandwidth throttling
 
 A home operator caps their own egress bandwidth via `PATCH /api/homes/<slug>/` (`bandwidth_limit_kbps`, range 100–10,000,000 kbps, `null` = unlimited) — but the enforcement runs on the cloud server, so it's worth knowing what it does there. When a limit is set, the cloud server runs, for that home's assigned port range:
