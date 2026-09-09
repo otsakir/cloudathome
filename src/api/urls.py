@@ -22,7 +22,7 @@ urlpatterns = [
     path('api/homes/<slug:home_slug>/proxy-mappings/tcp/', TcpProxyMappingCreateView.as_view(), name='create-tcp-proxy-mapping'),
     path('api/homes/<slug:home_slug>/proxy-mappings/tcp/<int:port>/', TcpProxyMappingDestroyAPIView.as_view(), name='delete-tcp-proxy-mapping'),
     path('api/homes/<slug:home_slug>/proxy-mappings/<str:scheme>/', SchemeProxyMappingCreateView.as_view(), name='create-proxy-mapping'),
-    path('api/homes/<slug:home_slug>/proxy-mappings/<str:scheme>/<str:host>/', SchemeProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
+    path('api/homes/<slug:home_slug>/proxy-mappings/<str:scheme>/<str:host>/<int:port>/', SchemeProxyMappingDestroyAPIView.as_view(), name='delete-proxy-mapping'),
 
     path('api/proxy/instance/', ProxyInstanceAPIView.as_view(), name='proxy-instance'),
 

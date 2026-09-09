@@ -227,7 +227,8 @@ class ProxyMappingListView(ListAPIView):
             'Allocates a tunnel port and registers a forwarding rule in HAProxy for the given scheme and hostname. '
             'The scheme is specified as a URL path segment (`http` or `https`). '
             'The hostname must be the base domain or a subdomain of one already registered for this home. '
-            'Each scheme may have at most one active mapping per hostname. '
+            'Each (scheme, hostname, public_port) combination may have at most one active mapping -- the same '
+            'hostname may have independent mappings at different ports. '
             'An optional `public_port` selects which port the mapping is published on; omit it to use this '
             "instance's standard port for the scheme (80 for HTTP, 443 for HTTPS, by default -- "
             'operator-configurable), or supply a port within the range returned by '
@@ -239,7 +240,7 @@ class ProxyMappingListView(ListAPIView):
             400: OpenApiResponse(description='public_port is neither the scheme default nor within the advertised inbound range'),
             403: OpenApiResponse(description='Host is not under any registered base domain'),
             404: OpenApiResponse(description='Unknown scheme (must be http or https)'),
-            409: OpenApiResponse(description='Mapping for this host and scheme already exists, or no free tunnel ports'),
+            409: OpenApiResponse(description='A mapping for this host, scheme, and port already exists, or no free tunnel ports'),
             500: OpenApiResponse(description='Failed to configure HAProxy'),
         },
     )
@@ -261,9 +262,6 @@ class SchemeProxyMappingCreateView(CreateAPIView):
         if not BaseDomainService.is_authorized(home, host):
             return Response({'message': 'host is not under any of your registered base domains'}, status=status.HTTP_403_FORBIDDEN)
 
-        if host in HAProxyService.get_used_hosts(scheme):
-            return Response({'message': 'a mapping for this host already exists'}, status=status.HTTP_409_CONFLICT)
-
         default_port = DEFAULT_SCHEME_PORTS[scheme]
         public_port = s.validated_data.get('public_port') or default_port
         if public_port != default_port:
@@ -273,6 +271,12 @@ class SchemeProxyMappingCreateView(CreateAPIView):
                     {'message': f'public_port must be {default_port} (default) or in range {range_base}–{range_base + range_count - 1}'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+        # A host can have independent mappings at different ports (http_frontend/
+        # https_frontend key their backend lookup on host:dst_port -- see
+        # haproxy.cfg) -- only an exact (host, public_port) repeat conflicts.
+        if HAProxyService.mapping_exists(scheme, host, public_port):
+            return Response({'message': 'a mapping for this host and port already exists'}, status=status.HTTP_409_CONFLICT)
 
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
@@ -351,10 +355,14 @@ class TcpProxyMappingCreateView(CreateAPIView):
 @extend_schema(
     tags=['home proxy mappings'],
     summary='Delete an HTTP/HTTPS proxy mapping',
-    description='Removes the HAProxy forwarding rule for the given scheme and hostname. Scheme must be `http` or `https`.',
+    description=(
+        'Removes the HAProxy forwarding rule for the given scheme, hostname, and port. Scheme must be `http` '
+        'or `https`. The port must be given explicitly since a hostname may have independent mappings at '
+        'more than one port.'
+    ),
     responses={
         204: OpenApiResponse(description='Mapping removed'),
-        404: OpenApiResponse(description='Unknown scheme, or no active mapping for this host'),
+        404: OpenApiResponse(description='Unknown scheme, or no active mapping for this host/port'),
         500: OpenApiResponse(description='Failed to remove mapping from HAProxy'),
     },
 )
@@ -362,15 +370,14 @@ class SchemeProxyMappingDestroyAPIView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, home_slug, scheme, host):
+    def delete(self, request, home_slug, scheme, host, port):
         if scheme not in ('http', 'https'):
             return Response(status=status.HTTP_404_NOT_FOUND)
         get_object_or_404(Home, slug=home_slug, user=request.user)
-        public_port = HAProxyService.get_host_public_port(scheme, host)
-        if public_port is None:
+        if not HAProxyService.mapping_exists(scheme, host, port):
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            HAProxyService.remove_http_mapping(scheme, host, public_port)
+            HAProxyService.remove_http_mapping(scheme, host, port)
         except OSError:
             return Response({'message': 'failed to remove proxy mapping'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(status=status.HTTP_204_NO_CONTENT)

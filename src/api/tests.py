@@ -56,9 +56,9 @@ class SchemeProxyMappingPortTest(TestCase):
 
     @patch('api.views.HAProxyService.add_mapping')
     @patch('api.views.HAProxyService.get_used_ports', return_value=set())
-    @patch('api.views.HAProxyService.get_used_hosts', return_value=set())
+    @patch('api.views.HAProxyService.mapping_exists', return_value=False)
     def test_create_without_public_port_defaults_to_scheme_standard_port(
-        self, mock_used_hosts, mock_used_ports, mock_add_mapping,
+        self, mock_exists, mock_used_ports, mock_add_mapping,
     ):
         resp = self.client.post('/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com'})
         self.assertEqual(resp.status_code, 201)
@@ -67,8 +67,8 @@ class SchemeProxyMappingPortTest(TestCase):
 
     @patch('api.views.HAProxyService.add_mapping')
     @patch('api.views.HAProxyService.get_used_ports', return_value=set())
-    @patch('api.views.HAProxyService.get_used_hosts', return_value=set())
-    def test_create_with_public_port_in_range(self, mock_used_hosts, mock_used_ports, mock_add_mapping):
+    @patch('api.views.HAProxyService.mapping_exists', return_value=False)
+    def test_create_with_public_port_in_range(self, mock_exists, mock_used_ports, mock_add_mapping):
         base, _ = settings.HTTPS_INBOUND_PORT_RANGE
         resp = self.client.post(
             '/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com', 'public_port': base},
@@ -78,22 +78,45 @@ class SchemeProxyMappingPortTest(TestCase):
         mock_add_mapping.assert_called_once_with('https', 2000, host='example.com', public_port=base)
 
     @patch('api.views.HAProxyService.get_used_ports', return_value=set())
-    @patch('api.views.HAProxyService.get_used_hosts', return_value=set())
-    def test_create_with_public_port_outside_range_is_rejected(self, mock_used_hosts, mock_used_ports):
+    @patch('api.views.HAProxyService.mapping_exists', return_value=False)
+    def test_create_with_public_port_outside_range_is_rejected(self, mock_exists, mock_used_ports):
         resp = self.client.post(
             '/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com', 'public_port': 1},
         )
         self.assertEqual(resp.status_code, 400)
 
+    @patch('api.views.HAProxyService.mapping_exists', return_value=True)
+    def test_create_conflicts_only_on_exact_host_scheme_port_repeat(self, mock_exists):
+        resp = self.client.post('/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com'})
+        self.assertEqual(resp.status_code, 409)
+        mock_exists.assert_called_once_with('https', 'example.com', 443)
+
     @patch('api.views.HAProxyService.remove_http_mapping')
-    @patch('api.views.HAProxyService.get_host_public_port', return_value=8443)
-    def test_delete_looks_up_current_port_and_removes_by_host_alone(self, mock_get_port, mock_remove):
-        resp = self.client.delete('/api/homes/testslug/proxy-mappings/https/example.com/')
+    @patch('api.views.HAProxyService.mapping_exists', return_value=True)
+    def test_delete_removes_the_mapping_at_the_given_port(self, mock_exists, mock_remove):
+        resp = self.client.delete('/api/homes/testslug/proxy-mappings/https/example.com/8443/')
         self.assertEqual(resp.status_code, 204)
-        mock_get_port.assert_called_once_with('https', 'example.com')
+        mock_exists.assert_called_once_with('https', 'example.com', 8443)
         mock_remove.assert_called_once_with('https', 'example.com', 8443)
 
-    @patch('api.views.HAProxyService.get_host_public_port', return_value=None)
-    def test_delete_with_no_active_mapping_404s(self, mock_get_port):
-        resp = self.client.delete('/api/homes/testslug/proxy-mappings/https/example.com/')
+    @patch('api.views.HAProxyService.mapping_exists', return_value=False)
+    def test_delete_with_no_active_mapping_at_that_port_404s(self, mock_exists):
+        resp = self.client.delete('/api/homes/testslug/proxy-mappings/https/example.com/8443/')
         self.assertEqual(resp.status_code, 404)
+
+    @patch('api.views.HAProxyService.add_mapping')
+    @patch('api.views.HAProxyService.get_used_ports', return_value=set())
+    @patch('api.views.HAProxyService.mapping_exists', return_value=False)
+    def test_same_host_can_have_a_second_mapping_at_a_different_port(
+        self, mock_exists, mock_used_ports, mock_add_mapping,
+    ):
+        """The same hostname can have independent https mappings at two
+        different ports simultaneously -- http_frontend/https_frontend key
+        their backend lookup on host:dst_port, not host alone (see
+        haproxy.cfg), so only an exact (host, scheme, port) repeat conflicts."""
+        base, _ = settings.HTTPS_INBOUND_PORT_RANGE
+        resp = self.client.post(
+            '/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com', 'public_port': base},
+        )
+        self.assertEqual(resp.status_code, 201)
+        mock_exists.assert_called_once_with('https', 'example.com', base)

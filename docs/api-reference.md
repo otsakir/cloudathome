@@ -15,8 +15,8 @@ This is the contract the home-side client (`cah.py` / Home Console) talks to —
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (blocked if active proxy mappings exist under it) |
 | GET | `/api/homes/<slug>/proxy-mappings/` | List active HAProxy mappings (HTTP/HTTPS + TCP) for this home |
-| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`; hostname must be under a registered base domain; optional `public_port`, defaults to 80/443) |
-| DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy |
+| POST | `/api/homes/<slug>/proxy-mappings/<scheme>/` | Allocate a tunnel port and register an HTTP/HTTPS mapping (`scheme` = `http`/`https`; hostname must be under a registered base domain; optional `public_port`, defaults to 80/443 — a hostname may have independent mappings at more than one port) |
+| DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/<port>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy (port is required since a hostname may have mappings at more than one) |
 | POST | `/api/homes/<slug>/proxy-mappings/tcp/` | Allocate a tunnel port and register a raw TCP mapping (public port must be in this home's TCP port range) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/tcp/<port>/` | Remove a TCP forwarding rule from HAProxy |
 | GET | `/api/config/inbound-ports/<scheme>/` | Get the shared, system-wide inbound port range for HTTP/HTTPS mappings |

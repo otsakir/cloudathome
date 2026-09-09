@@ -141,12 +141,17 @@ class HAProxyService:
         return entries
 
     @classmethod
-    def get_host_public_port(cls, scheme, host):
-        """Return the public_port currently registered for host under scheme, or None."""
-        for entry in cls.dump_mappings():
-            if entry.get('scheme') == scheme and entry.get('host') == host:
-                return entry['public_port']
-        return None
+    def mapping_exists(cls, scheme, host, public_port):
+        """Whether a mapping for exactly this (scheme, host, public_port) is
+        currently registered. Both http_frontend and https_frontend key their
+        backend lookup on `host:dst_port` (the actual port the client
+        connected to, not anything request-supplied) -- see haproxy.cfg -- so
+        the same host can legitimately have independent mappings at different
+        ports; port is therefore part of the identity, not just an attribute."""
+        return any(
+            entry.get('scheme') == scheme and entry.get('host') == host and entry.get('public_port') == public_port
+            for entry in cls.dump_mappings()
+        )
 
     @classmethod
     def get_used_ports(cls):
@@ -159,9 +164,13 @@ class HAProxyService:
         return used
 
     @classmethod
-    def get_used_hosts(cls, scheme):
-        """Return the set of hostnames currently registered for the given scheme (http or https)."""
-        return {entry['host'] for entry in cls.dump_mappings() if entry.get('scheme') == scheme}
+    def get_used_host_ports(cls, scheme):
+        """Return the set of (host, public_port) pairs currently registered
+        for the given scheme (http or https)."""
+        return {
+            (entry['host'], entry['public_port'])
+            for entry in cls.dump_mappings() if entry.get('scheme') == scheme
+        }
 
     @classmethod
     def get_used_tcp_public_ports(cls):
