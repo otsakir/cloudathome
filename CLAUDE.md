@@ -172,7 +172,7 @@ src/
     └── web/                                # MVC web UI
         ├── views.py
         ├── forms.py
-        ├── services.py                    # HomeConfigService: builds home config.yaml, manages/rotates API tokens
+        ├── services.py                    # HomeConfigService: manages/rotates API tokens
         └── templates/web/
 ```
 
@@ -202,4 +202,4 @@ Authentication is session-based (web UI) or token-based (`TokenAuthentication`, 
 
 ### Web UI
 
-Session-authenticated MVC views in `web/` (`web/views.py`, `web/forms.py`, `web/urls.py`) let a signed-up user view their dashboard (a read-only view of live proxy mappings — creating/removing them is done from the home side, not here), generate/rotate their API token (`RotateTokenView` — this is also how a user gets their first token; there's no separate web-form "register a home" flow, that goes through `POST /api/homes/` via the home-side `cah.py register`), edit their SSH key, download a config-template for the home-side client (`ClientConfigView`, secrets left blank), and release their home slot. `web/services.py`'s `HomeConfigService` renders that template and manages the user's DRF token lifecycle.
+Session-authenticated MVC views in `web/` (`web/views.py`, `web/forms.py`, `web/urls.py`) let a signed-up user view their dashboard (a read-only view of live proxy mappings — creating/removing them is done from the home side, not here), generate/rotate their API token (`RotateTokenView` — this is also how a user gets their first token; there's no separate web-form "register a home" flow, that goes through `POST /api/homes/` via the home-side `cah.py register`), edit their SSH key, and release their home slot. `web/services.py`'s `HomeConfigService` manages the user's DRF token lifecycle. There's no home-side config download — the home-side client builds its own config. `web/` also serves the public (no login) landing page and `/guides/`.

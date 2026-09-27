@@ -114,7 +114,7 @@ That's the entire admin-side involvement in onboarding. From here the home opera
 
 ### The per-home dashboard
 
-Once activated, a home operator's own dashboard (`/dashboard/`) shows their home's connection details and a **read-only** list of currently live proxy mappings — creating and removing mappings is a Home Console (home-side) responsibility, not something exposed here. From their dashboard a user can also generate/rotate their own API token, update their registered SSH public key, download a home-side `config.yaml` template (with the auth token and key path left blank, so it's safe to view without leaking a live credential), and release their own home slot.
+Once activated, a home operator's own dashboard (`/home/dashboard/`) shows their home's connection details and a **read-only** list of currently live proxy mappings — creating and removing mappings is a Home Console (home-side) responsibility, not something exposed here. From their dashboard a user can also generate/rotate their own API token, update their registered SSH public key, and release their own home slot.
 
 ### Admin-only operations
 
