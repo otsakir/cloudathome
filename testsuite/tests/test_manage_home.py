@@ -1,6 +1,6 @@
 import argparse
 import pytest
-from tunnels.ssh.manage_home import (
+from core.ssh.manage_home import (
     Config, TunnelManager, BandwidthManager, UserError,
     _build_parser, _public_key_file_type,
 )

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from tunnels.services import TLS_CERT_FILE, HAProxyService
+from core.services import TLS_CERT_FILE, HAProxyService
 
 
 DEFAULT_SCHEME_PORT = {'http': 80, 'https': 443}

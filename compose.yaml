@@ -57,7 +57,7 @@ services:
       # MAX_HOME_COUNT and friends (fleet-size sizing) are intentionally not passed
       # here -- scripts/generate_fleet_config.py bakes them into
       # docker/django/fleet_config.json at build time instead. See
-      # tunnels/ssh/manage_home.py's module docstring for why.
+      # core/ssh/manage_home.py's module docstring for why.
     cap_add:
       - NET_ADMIN
     volumes:

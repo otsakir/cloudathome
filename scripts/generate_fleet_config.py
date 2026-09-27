@@ -52,7 +52,7 @@ END_MARKER = '# END GENERATED BACKENDS'
 # no Django dependency at module scope) and imported here, rather than duplicated,
 # so the two never hand-drift apart.
 sys.path.insert(0, str(REPO_ROOT / 'src'))
-from tunnels.ssh.manage_home import FLEET_DEFAULTS as DEFAULTS, FleetConfigError, validate_fleet_config  # noqa: E402
+from core.ssh.manage_home import FLEET_DEFAULTS as DEFAULTS, FleetConfigError, validate_fleet_config  # noqa: E402
 
 
 def parse_env_file(path):

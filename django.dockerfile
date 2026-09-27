@@ -43,7 +43,7 @@ RUN mkdir -p /etc/cloudathome/certs && chown -R django:django /etc/cloudathome/c
 RUN mkdir -p /opt/static && chown -R django:django /opt/static
 
 # tunnel users management scripts
-COPY src/tunnels/ssh/manage_home.py /usr/local/bin/
+COPY src/core/ssh/manage_home.py /usr/local/bin/
 RUN chmod 700 /usr/local/bin/manage_home.py
 COPY ./docker/django/sudoers.d/tunneling /etc/sudoers.d/
 RUN chmod 440 /etc/sudoers.d/tunneling

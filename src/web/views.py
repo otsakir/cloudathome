@@ -8,9 +8,9 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
-from tunnels.models import Home
-from tunnels.services import ElevatedOperations, HAProxyService, release_home
-from tunnels.ssh.manage_home import tunnel_manager
+from core.models import Home
+from core.services import ElevatedOperations, HAProxyService, release_home
+from core.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, UpdatePublicKeyForm
 from web.services import HomeConfigService
 

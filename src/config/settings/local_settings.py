@@ -33,7 +33,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'tunnels.apps.TunnelsConfig',
+    'core.apps.CoreConfig',
     'api.apps.ApiConfig',
     'web.apps.WebConfig',
     'webpages.apps.WebpagesConfig',
@@ -168,7 +168,7 @@ CAH_HTTPS_PORT = int(os.environ.get('CAH_HTTPS_PORT', '443'))
 # Required (in the docker-composed stack -- see reconcile_admin_route) hostname
 # this instance's own Django (admin/API/web UI) answers on, routed through
 # HAProxy's existing Host/SNI-based maps (see
-# tunnels.management.commands.reconcile_admin_route) -- the only way to reach
+# core.management.commands.reconcile_admin_route) -- the only way to reach
 # Django, there's no separate published port. Reachable over both HTTP and
 # HTTPS, at CAH_HTTP_PORT/CAH_HTTPS_PORT, since Django terminates its own HTTPS
 # via gunicorn (see docker/django/entrypoint.sh). Left unset here for local,
@@ -204,7 +204,7 @@ HTTP_INBOUND_PORT_RANGE = _parse_port_range('HTTP_INBOUND_PORT_RANGE', '8080-818
 HTTPS_INBOUND_PORT_RANGE = _parse_port_range('HTTPS_INBOUND_PORT_RANGE', '8443-8543')
 
 # The default `public_port` a home's HTTP/HTTPS mapping gets when it omits one
-# (tunnels.services.DEFAULT_SCHEME_PORTS) -- independent of CAH_HTTP_PORT/
+# (core.services.DEFAULT_SCHEME_PORTS) -- independent of CAH_HTTP_PORT/
 # CAH_HTTPS_PORT above, which are this instance's own standard port (and
 # CAH_HOSTNAME's). The two happen to coincide by default, but don't have to:
 # e.g. an operator running a second instance on the same host might move

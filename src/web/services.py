@@ -2,7 +2,7 @@ import yaml
 from django.conf import settings
 from rest_framework.authtoken.models import Token
 
-from tunnels.ssh.manage_home import tunnel_manager
+from core.ssh.manage_home import tunnel_manager
 
 # Explanatory comments inserted above blank fields when a config is redacted,
 # telling the user what to fill in and where to find it.

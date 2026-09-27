@@ -85,7 +85,7 @@ docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py migrat
 docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
 ```
 
-The `migrate` step also provisions this instance's home slots automatically via the data migration `tunnels/migrations/0003_provision_homes.py`, sized to whatever `MAX_HOME_COUNT` was locked in at step 2 (10 by default) — fixed for the life of this instance, per the fleet-size note above.
+The `migrate` step also provisions this instance's home slots automatically via the data migration `core/migrations/0003_provision_homes.py`, sized to whatever `MAX_HOME_COUNT` was locked in at step 2 (10 by default) — fixed for the life of this instance, per the fleet-size note above.
 
 The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 

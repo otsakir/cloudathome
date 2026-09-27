@@ -6,15 +6,15 @@ from django.conf import settings
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
-from tunnels.models import Home
+from core.models import Home
 from .serializers import HomeSerializer, OutHomeSerializer, UpdateHomeKeySerializer, HomeBandwidthSerializer, ProxyMappingHttpSerializer, ProxyMappingTcpSerializer, WebProxyMappingResponseSerializer, TcpProxyMappingResponseSerializer, BaseDomainSerializer, BaseDomainResponseSerializer, InboundPortRangeSerializer
 
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
-from tunnels.models import HomeBaseDomain
-from tunnels.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home, DEFAULT_SCHEME_PORTS
-from tunnels.ssh.manage_home import tunnel_manager
+from core.models import HomeBaseDomain
+from core.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home, DEFAULT_SCHEME_PORTS
+from core.ssh.manage_home import tunnel_manager
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiParameter, inline_serializer
@@ -533,7 +533,7 @@ class HomeSyncView(APIView):
 
     def post(self, request):
         import pwd
-        from tunnels.services import ElevatedOperations as EO
+        from core.services import ElevatedOperations as EO
 
         homes = list(Home.objects.filter(user__isnull=False).select_related('user'))
         reconciled = 0

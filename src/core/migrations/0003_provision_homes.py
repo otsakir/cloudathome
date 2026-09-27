@@ -1,6 +1,6 @@
 from django.db import migrations
 
-from tunnels.ssh.manage_home import tunnel_manager
+from core.ssh.manage_home import tunnel_manager
 
 
 def provision_homes(apps, schema_editor):

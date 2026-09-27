@@ -3,7 +3,7 @@ import re
 from django import forms
 from django.contrib.auth.models import User
 
-from tunnels.ssh.manage_home import Config
+from core.ssh.manage_home import Config
 
 _USERNAME_PATTERN = re.compile(f'^{Config.USERNAME_SUFFIX_PATTERN}$')
 

@@ -15,7 +15,7 @@ TCP_MAP_FILE = '/usr/local/etc/haproxy/maps/tcp_backends.map'
 
 # Fixed backends (declared in haproxy.cfg, not per-home generated) that front
 # this instance's own Django. See settings.CAH_HOSTNAME and
-# tunnels.management.commands.reconcile_admin_route.
+# core.management.commands.reconcile_admin_route.
 ADMIN_HTTP_BACKEND = 'cah_django_http_backend'
 ADMIN_HTTP_REDIRECT_BACKEND = 'cah_django_http_redirect_backend'
 ADMIN_HTTPS_BACKEND = 'cah_django_https_backend'
@@ -234,7 +234,7 @@ class BaseDomainService:
         reservation and the overlap checks against other homes' domains below
         still apply unconditionally either way.
         """
-        from tunnels.models import HomeBaseDomain
+        from core.models import HomeBaseDomain
 
         domain = domain.strip().lower()
         if settings.BASE_DOMAIN_ALLOW_NON_REGISTRABLE:
@@ -274,7 +274,7 @@ class BaseDomainService:
     @staticmethod
     def has_active_mappings(home, base_domain: str) -> bool:
         """Return True if HAProxy has any active mappings under base_domain for this home."""
-        from tunnels.ssh.manage_home import tunnel_manager
+        from core.ssh.manage_home import tunnel_manager
         port_base = tunnel_manager.get_home_port_base(home.home_index)
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         mappings = HAProxyService.get_home_mappings(
@@ -351,7 +351,7 @@ def release_home(home):
     callers should catch that specifically to report a clean error.
     """
     from django.db import transaction
-    from tunnels.ssh.manage_home import tunnel_manager
+    from core.ssh.manage_home import tunnel_manager
 
     port_base = tunnel_manager.get_home_port_base(home.home_index)
     tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)

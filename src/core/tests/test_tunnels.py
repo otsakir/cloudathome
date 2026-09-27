@@ -8,9 +8,9 @@ from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
-from tunnels.models import Home, HomeBaseDomain
-from tunnels.services import BaseDomainService, HAProxyService
-from tunnels.ssh.manage_home import Config, TunnelManager, _build_parser
+from core.models import Home, HomeBaseDomain
+from core.services import BaseDomainService, HAProxyService
+from core.ssh.manage_home import Config, TunnelManager, _build_parser
 import os
 import shutil
 from argparse import ArgumentParser
@@ -223,8 +223,8 @@ class EnsureAdminRouteTest(TestCase):
     setting."""
 
     @override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80, CAH_HTTPS_PORT=443)
-    @patch('tunnels.services.HAProxyService.https_available', return_value=True)
-    @patch('tunnels.services.HAProxyService._send_command')
+    @patch('core.services.HAProxyService.https_available', return_value=True)
+    @patch('core.services.HAProxyService._send_command')
     def test_seeds_redirect_and_https_entries_when_cert_present(self, mock_send, mock_https_available):
         result = HAProxyService.ensure_admin_route()
         mock_send.assert_has_calls([
@@ -237,8 +237,8 @@ class EnsureAdminRouteTest(TestCase):
         self.assertEqual(result, {'https_enabled': True})
 
     @override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80, CAH_HTTPS_PORT=443)
-    @patch('tunnels.services.HAProxyService.https_available', return_value=False)
-    @patch('tunnels.services.HAProxyService._send_command')
+    @patch('core.services.HAProxyService.https_available', return_value=False)
+    @patch('core.services.HAProxyService._send_command')
     def test_seeds_plain_http_entry_only_when_no_cert(self, mock_send, mock_https_available):
         result = HAProxyService.ensure_admin_route()
         mock_send.assert_has_calls([
@@ -250,7 +250,7 @@ class EnsureAdminRouteTest(TestCase):
         self.assertEqual(result, {'https_enabled': False})
 
     @override_settings(CAH_HOSTNAME=None)
-    @patch('tunnels.services.HAProxyService._send_command')
+    @patch('core.services.HAProxyService._send_command')
     def test_no_op_when_unconfigured(self, mock_send):
         result = HAProxyService.ensure_admin_route()
         mock_send.assert_not_called()
@@ -269,8 +269,8 @@ class ReconcileAdminRouteCommandTest(TestCase):
             call_command('reconcile_admin_route')
 
     @override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80, CAH_HTTPS_PORT=443)
-    @patch('tunnels.services.HAProxyService.https_available', return_value=True)
-    @patch('tunnels.services.HAProxyService._send_command')
+    @patch('core.services.HAProxyService.https_available', return_value=True)
+    @patch('core.services.HAProxyService._send_command')
     def test_reports_https_enabled_when_cert_present(self, mock_send, mock_https_available):
         out = StringIO()
         call_command('reconcile_admin_route', stdout=out)
@@ -280,8 +280,8 @@ class ReconcileAdminRouteCommandTest(TestCase):
         self.assertIn('Django HTTPS: enabled at https://cloud.example.com/', output)
 
     @override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80, CAH_HTTPS_PORT=443)
-    @patch('tunnels.services.HAProxyService.https_available', return_value=False)
-    @patch('tunnels.services.HAProxyService._send_command')
+    @patch('core.services.HAProxyService.https_available', return_value=False)
+    @patch('core.services.HAProxyService._send_command')
     def test_reports_https_disabled_when_no_cert(self, mock_send, mock_https_available):
         out = StringIO()
         call_command('reconcile_admin_route', stdout=out)

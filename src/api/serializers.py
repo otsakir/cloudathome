@@ -1,8 +1,8 @@
 import sys
 from django.conf import settings
 from rest_framework import serializers
-from tunnels.models import Home
-from tunnels.ssh.manage_home import tunnel_manager
+from core.models import Home
+from core.ssh.manage_home import tunnel_manager
 
 
 class HomeSerializer(serializers.Serializer):
