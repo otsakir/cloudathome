@@ -95,13 +95,13 @@ def test_sshdconfig_no_tty(sshdconfig_content):
 def test_sshdconfig_permit_listen_port_count(sshdconfig_content, config):
     line = next(l for l in sshdconfig_content.splitlines() if 'PermitListen' in l)
     ports = line.split()[1:]  # drop 'PermitListen'
-    assert len(ports) == config.PORTS_PER_HOME
+    assert len(ports) == config.TUNNEL_PORTS_PER_HOME
 
 def test_sshdconfig_permit_listen_port_range(sshdconfig_content, tunnel_manager):
     line = next(l for l in sshdconfig_content.splitlines() if 'PermitListen' in l)
     port_numbers = [int(p.split(':')[1]) for p in line.split()[1:]]
     port_base = tunnel_manager.get_home_port_base(0)
-    assert port_numbers == list(range(port_base, port_base + tunnel_manager.config.PORTS_PER_HOME))
+    assert port_numbers == list(range(port_base, port_base + tunnel_manager.config.TUNNEL_PORTS_PER_HOME))
 
 def test_sshdconfig_remove_deletes_file(tunnel_manager, config):
     port_base = tunnel_manager.get_home_port_base(0)
@@ -167,9 +167,9 @@ def test_bandwidth_mark(bandwidth_manager, home_id):
 @pytest.mark.parametrize('home_id', range(10))
 def test_bandwidth_port_range(bandwidth_manager, config, home_id):
     lo, hi = bandwidth_manager._port_range(home_id)
-    expected_lo = config.HOME_PORTS_BASE + home_id * config.PORTS_PER_HOME_RESERVED
+    expected_lo = config.TUNNEL_PORTS_BASE + home_id * config.TUNNEL_PORTS_PER_HOME_RESERVED
     assert lo == expected_lo
-    assert hi == expected_lo + config.PORTS_PER_HOME - 1
+    assert hi == expected_lo + config.TUNNEL_PORTS_PER_HOME - 1
 
 
 # --- argument parser ---

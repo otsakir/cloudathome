@@ -279,7 +279,7 @@ class BaseDomainService:
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         mappings = HAProxyService.get_home_mappings(
             port_base,
-            tunnel_manager.config.PORTS_PER_HOME,
+            tunnel_manager.config.TUNNEL_PORTS_PER_HOME,
             tcp_public_port_base=tcp_port_base,
             tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
         )
@@ -357,7 +357,7 @@ def release_home(home):
     tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
     mappings = HAProxyService.get_home_mappings(
         port_base,
-        tunnel_manager.config.PORTS_PER_HOME,
+        tunnel_manager.config.TUNNEL_PORTS_PER_HOME,
         tcp_public_port_base=tcp_port_base,
         tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
     )

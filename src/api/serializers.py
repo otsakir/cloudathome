@@ -98,7 +98,7 @@ class OutHomeSerializer(serializers.ModelSerializer):
         return tunnel_manager.get_home_port_base(home_id=obj.home_index)
 
     def get_port_count(self, obj: Home) -> int:
-        return tunnel_manager.config.PORTS_PER_HOME
+        return tunnel_manager.config.TUNNEL_PORTS_PER_HOME
 
     def get_tcp_port_base(self, obj: Home) -> int:
         return tunnel_manager.get_home_tcp_public_port_base(home_id=obj.home_index)

@@ -64,9 +64,9 @@ def _run(args, **kwargs):
 # (local dev, the standalone pytest suite) -- see the module docstring above.
 FLEET_DEFAULTS = {
     'MAX_HOME_COUNT': 10,
-    'PORTS_PER_HOME': 10,
-    'PORTS_PER_HOME_RESERVED': 100,
-    'HOME_PORTS_BASE': 2000,
+    'TUNNEL_PORTS_PER_HOME': 10,
+    'TUNNEL_PORTS_PER_HOME_RESERVED': 100,
+    'TUNNEL_PORTS_BASE': 2000,
     'TCP_PUBLIC_PORTS_BASE': 10000,
     'TCP_PUBLIC_PORTS_PER_HOME': 10,
 }
@@ -89,10 +89,10 @@ def validate_fleet_config(values):
         if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
             raise FleetConfigError(f'{key} must be a positive integer, got {value!r}')
 
-    if values['PORTS_PER_HOME'] > values['PORTS_PER_HOME_RESERVED']:
+    if values['TUNNEL_PORTS_PER_HOME'] > values['TUNNEL_PORTS_PER_HOME_RESERVED']:
         raise FleetConfigError(
-            f"PORTS_PER_HOME ({values['PORTS_PER_HOME']}) must not exceed "
-            f"PORTS_PER_HOME_RESERVED ({values['PORTS_PER_HOME_RESERVED']}) -- "
+            f"TUNNEL_PORTS_PER_HOME ({values['TUNNEL_PORTS_PER_HOME']}) must not exceed "
+            f"TUNNEL_PORTS_PER_HOME_RESERVED ({values['TUNNEL_PORTS_PER_HOME_RESERVED']}) -- "
             "otherwise adjacent homes' tunnel port ranges overlap."
         )
 
@@ -130,9 +130,9 @@ class Config:
     USERNAME_PATTERN = f'{HOME_PREFIX}([0-9]){{2}}_{USERNAME_SUFFIX_PATTERN}'
 
     MAX_HOME_COUNT = _fleet_value(_installed_fleet_config, 'MAX_HOME_COUNT')
-    PORTS_PER_HOME = _fleet_value(_installed_fleet_config, 'PORTS_PER_HOME')
-    PORTS_PER_HOME_RESERVED = _fleet_value(_installed_fleet_config, 'PORTS_PER_HOME_RESERVED')
-    HOME_PORTS_BASE = _fleet_value(_installed_fleet_config, 'HOME_PORTS_BASE')
+    TUNNEL_PORTS_PER_HOME = _fleet_value(_installed_fleet_config, 'TUNNEL_PORTS_PER_HOME')
+    TUNNEL_PORTS_PER_HOME_RESERVED = _fleet_value(_installed_fleet_config, 'TUNNEL_PORTS_PER_HOME_RESERVED')
+    TUNNEL_PORTS_BASE = _fleet_value(_installed_fleet_config, 'TUNNEL_PORTS_BASE')
     TCP_PUBLIC_PORTS_BASE = _fleet_value(_installed_fleet_config, 'TCP_PUBLIC_PORTS_BASE')
     TCP_PUBLIC_PORTS_PER_HOME = _fleet_value(_installed_fleet_config, 'TCP_PUBLIC_PORTS_PER_HOME')
 
@@ -149,7 +149,7 @@ class Config:
             setattr(self, k, kwargs[k])
 
     def __str__(self):
-        return str({'PORTS_PER_HOME': self.PORTS_PER_HOME})
+        return str({'TUNNEL_PORTS_PER_HOME': self.TUNNEL_PORTS_PER_HOME})
 
 
 class HomeScriptError(Exception):
@@ -217,7 +217,7 @@ class TunnelManager:
         config_file.write(f'Match User {username}\n')
         listen_ports = " ".join([
             f'{self.config.LISTENING_NETWORK_INTERFACE}:{port}'
-            for port in range(port_base, port_base + self.config.PORTS_PER_HOME)
+            for port in range(port_base, port_base + self.config.TUNNEL_PORTS_PER_HOME)
         ])
         config_file.write(f'    PermitListen {listen_ports}\n')
         config_file.write(f'    PermitTTY no\n')
@@ -245,9 +245,9 @@ class TunnelManager:
             raise UserError('bad home index')
 
     def get_home_port_base(self, home_id: int):
-        # Stride is PORTS_PER_HOME_RESERVED (100), not PORTS_PER_HOME (10), giving each
+        # Stride is TUNNEL_PORTS_PER_HOME_RESERVED (100), not TUNNEL_PORTS_PER_HOME (10), giving each
         # home headroom to expand without renumbering all subsequent homes.
-        return self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
+        return self.config.TUNNEL_PORTS_BASE + home_id * self.config.TUNNEL_PORTS_PER_HOME_RESERVED
 
     def get_home_tcp_public_port_base(self, home_id: int):
         return self.config.TCP_PUBLIC_PORTS_BASE + home_id * self.config.TCP_PUBLIC_PORTS_PER_HOME
@@ -332,8 +332,8 @@ class BandwidthManager:
 
     def _port_range(self, home_id: int):
         # Returns inclusive [lo, hi]; iptables --sport requires a closed range.
-        base = self.config.HOME_PORTS_BASE + home_id * self.config.PORTS_PER_HOME_RESERVED
-        return base, base + self.config.PORTS_PER_HOME - 1
+        base = self.config.TUNNEL_PORTS_BASE + home_id * self.config.TUNNEL_PORTS_PER_HOME_RESERVED
+        return base, base + self.config.TUNNEL_PORTS_PER_HOME - 1
 
     def _ensure_root_qdisc(self):
         result = _run(

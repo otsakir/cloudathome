@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Materializes fleet-size-derived install artifacts from .env.
 
-Reads the fleet-size settings (MAX_HOME_COUNT, PORTS_PER_HOME,
-PORTS_PER_HOME_RESERVED, HOME_PORTS_BASE, TCP_PUBLIC_PORTS_BASE,
+Reads the fleet-size settings (MAX_HOME_COUNT, TUNNEL_PORTS_PER_HOME,
+TUNNEL_PORTS_PER_HOME_RESERVED, TUNNEL_PORTS_BASE, TCP_PUBLIC_PORTS_BASE,
 TCP_PUBLIC_PORTS_PER_HOME) from .env, validates them, and:
 
   1. Writes the `backend tunnel_<port>` / `backend http_tunnel_<port>` stanzas
@@ -70,8 +70,20 @@ def parse_env_file(path):
     return values
 
 
+# Pre-rename names -- an .env still using these would otherwise have them
+# silently ignored and the defaults used instead.
+RENAMED_KEYS = {
+    'HOME_PORTS_BASE': 'TUNNEL_PORTS_BASE',
+    'PORTS_PER_HOME': 'TUNNEL_PORTS_PER_HOME',
+    'PORTS_PER_HOME_RESERVED': 'TUNNEL_PORTS_PER_HOME_RESERVED',
+}
+
+
 def load_config(env_file):
     env_values = parse_env_file(env_file)
+    stale = [f'{old} -> {new}' for old, new in RENAMED_KEYS.items() if old in env_values]
+    if stale:
+        sys.exit(f'error: {env_file}: rename these variables: {", ".join(stale)}')
     config = {}
     for key, default in DEFAULTS.items():
         raw = env_values.get(key)
@@ -87,14 +99,14 @@ def load_config(env_file):
 
 def render_backends(config):
     home_bases = [
-        config['HOME_PORTS_BASE'] + home_index * config['PORTS_PER_HOME_RESERVED']
+        config['TUNNEL_PORTS_BASE'] + home_index * config['TUNNEL_PORTS_PER_HOME_RESERVED']
         for home_index in range(config['MAX_HOME_COUNT'])
     ]
 
     lines = ['# Pre-created backends for all allocated tunnel ports '
-             f'({config["MAX_HOME_COUNT"]} homes x {config["PORTS_PER_HOME"]} ports each)']
+             f'({config["MAX_HOME_COUNT"]} homes x {config["TUNNEL_PORTS_PER_HOME"]} ports each)']
     for base in home_bases:
-        for port in range(base, base + config['PORTS_PER_HOME']):
+        for port in range(base, base + config['TUNNEL_PORTS_PER_HOME']):
             lines.append(f'backend tunnel_{port}')
             lines.append(f'  server tunnel tunnelagent:{port}')
         lines.append('')
@@ -102,7 +114,7 @@ def render_backends(config):
     lines.append('# HTTP backends for all tunnel ports (mode http, used for ACME challenges '
                   'and plain HTTP proxying)')
     for base in home_bases:
-        for port in range(base, base + config['PORTS_PER_HOME']):
+        for port in range(base, base + config['TUNNEL_PORTS_PER_HOME']):
             lines.append(f'backend http_tunnel_{port}')
             lines.append('  mode http')
             lines.append(f'  server tunnel tunnelagent:{port}')
@@ -186,9 +198,9 @@ def main():
     new_cfg_text = splice(args.cfg_file.read_text(), generated, args.cfg_file)
     args.cfg_file.write_text(new_cfg_text)
 
-    total = config['MAX_HOME_COUNT'] * config['PORTS_PER_HOME']
+    total = config['MAX_HOME_COUNT'] * config['TUNNEL_PORTS_PER_HOME']
     print(f'Wrote {total} tunnel_* + {total} http_tunnel_* backend stanzas '
-          f'({config["MAX_HOME_COUNT"]} homes x {config["PORTS_PER_HOME"]} ports each) to {args.cfg_file}')
+          f'({config["MAX_HOME_COUNT"]} homes x {config["TUNNEL_PORTS_PER_HOME"]} ports each) to {args.cfg_file}')
 
     tcp_public_port_range = render_tcp_public_port_range(config)
     update_env_var(args.env_file, 'TCP_PUBLIC_PORT_RANGE', tcp_public_port_range)

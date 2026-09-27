@@ -8,6 +8,7 @@ This repo is the **cloud-side** component: HAProxy plus the Django API/SSH serve
 
 - [Vision](docs/vision.md) — why the cloud is deliberately kept "dumb", and what that buys a home operator
 - [Architecture](docs/architecture.md) — components and the full request/tunnel lifecycle
+- [Configuration reference](docs/configuration.md) — every `.env` variable, and which ones can change after install
 - [REST API reference](docs/api-reference.md) — the contract home-side clients talk to
 - [Home-configurable features](docs/features.md) — base domains, bandwidth throttling, custom inbound ports: home-operator self-service, but useful when triaging a report
 - [Testing your deployment locally](docs/local-smoke-test.md) — an end-to-end smoke test on one machine, no real domain needed
@@ -23,6 +24,8 @@ To deploy and run the cloud server for the first time, follow the four steps bel
 ```bash
 cp .env.example .env
 ```
+
+See [configuration reference](docs/configuration.md) for a detailed reference of all environmental variables supported.
 
 By default, both Django (website/API) and homes' public endpoints listen on
 ports 80/443. Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` or `HTTP_INBOUND_DEFAULT_PORT`/
@@ -50,8 +53,8 @@ for the full picture.
 ### Configure installation capacity
 
 Next, configure the instance capacity. The number of homes allowed to register and the number
-of proxied ports per home (`MAX_HOME_COUNT`, `PORTS_PER_HOME`, and friends; defaults to 10
-homes). **This is an install-time-only decision — there's no supported way to
+of proxied ports per home (`MAX_HOME_COUNT`, `TUNNEL_PORTS_PER_HOME`, and friends; `.env.example` starts
+with a minimal 2 homes × 5 ports). **This is an install-time-only decision — there's no supported way to
 change it once homes have registered** — so decide it now if the defaults don't
 fit, then lock it in:
 

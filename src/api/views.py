@@ -212,7 +212,7 @@ class ProxyMappingListView(ListAPIView):
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         mappings = HAProxyService.get_home_mappings(
             port_base,
-            tunnel_manager.config.PORTS_PER_HOME,
+            tunnel_manager.config.TUNNEL_PORTS_PER_HOME,
             tcp_public_port_base=tcp_port_base,
             tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
         )
@@ -237,7 +237,11 @@ class ProxyMappingListView(ListAPIView):
         request=ProxyMappingHttpSerializer,
         responses={
             201: WebProxyMappingResponseSerializer,
-            400: OpenApiResponse(description='public_port is neither the scheme default nor within the advertised inbound range'),
+            400: OpenApiResponse(description=(
+                'public_port is neither the scheme default nor within the advertised inbound range. '
+                'Body: `code` = `public_port_not_offered`, `message`, and the currently offered `default_port` '
+                'and `ranges` (same shape as GET /api/config/inbound-ports/<scheme>/).'
+            )),
             403: OpenApiResponse(description='Host is not under any registered base domain'),
             404: OpenApiResponse(description='Unknown scheme (must be http or https)'),
             409: OpenApiResponse(description='A mapping for this host, scheme, and port already exists, or no free tunnel ports'),
@@ -267,8 +271,16 @@ class SchemeProxyMappingCreateView(CreateAPIView):
         if public_port != default_port:
             range_base, range_count = getattr(settings, f'{scheme.upper()}_INBOUND_PORT_RANGE')
             if not (range_base <= public_port < range_base + range_count):
+                # `code` plus the currently offered ports let the home side tell
+                # this apart from other 400s -- notably when re-registering a
+                # mapping whose port an operator has since dropped from the range.
                 return Response(
-                    {'message': f'public_port must be {default_port} (default) or in range {range_base}–{range_base + range_count - 1}'},
+                    {
+                        'code': 'public_port_not_offered',
+                        'message': f'public_port must be {default_port} (default) or in range {range_base}–{range_base + range_count - 1}',
+                        'default_port': default_port,
+                        'ranges': [{'port_base': range_base, 'port_count': range_count}],
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -279,7 +291,7 @@ class SchemeProxyMappingCreateView(CreateAPIView):
             return Response({'message': 'a mapping for this host and port already exists'}, status=status.HTTP_409_CONFLICT)
 
         port_base = tunnel_manager.get_home_port_base(home.home_index)
-        port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
+        port_max = port_base + tunnel_manager.config.TUNNEL_PORTS_PER_HOME
         used = HAProxyService.get_used_ports()
         try:
             tunnel_port = next(p for p in range(port_base, port_max) if p not in used)
@@ -325,7 +337,7 @@ class TcpProxyMappingCreateView(CreateAPIView):
         public_port = s.validated_data['public_port']
 
         port_base = tunnel_manager.get_home_port_base(home.home_index)
-        port_max = port_base + tunnel_manager.config.PORTS_PER_HOME
+        port_max = port_base + tunnel_manager.config.TUNNEL_PORTS_PER_HOME
 
         tcp_port_base = tunnel_manager.get_home_tcp_public_port_base(home.home_index)
         tcp_port_max = tcp_port_base + tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME

@@ -84,6 +84,11 @@ class SchemeProxyMappingPortTest(TestCase):
             '/api/homes/testslug/proxy-mappings/https/', {'host': 'example.com', 'public_port': 1},
         )
         self.assertEqual(resp.status_code, 400)
+        base, count = settings.HTTPS_INBOUND_PORT_RANGE
+        body = resp.json()
+        self.assertEqual(body['code'], 'public_port_not_offered')
+        self.assertEqual(body['default_port'], 443)
+        self.assertEqual(body['ranges'], [{'port_base': base, 'port_count': count}])
 
     @patch('api.views.HAProxyService.mapping_exists', return_value=True)
     def test_create_conflicts_only_on_exact_host_scheme_port_repeat(self, mock_exists):
