@@ -28,6 +28,10 @@ class LandingView(TemplateView):
     template_name = 'web/landing.html'
 
 
+class GuidesView(TemplateView):
+    template_name = 'web/guides.html'
+
+
 class SignupView(FormView):
     template_name = 'web/signup.html'
     form_class = SignupForm
