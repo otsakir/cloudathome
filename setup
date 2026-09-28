@@ -197,21 +197,28 @@ def backup_database():
         result = subprocess.run(
             ['docker', 'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'mv', 'tunnelagent',
              f'/opt/backend-var/{DB_MARKER_FILE.name}', f'/opt/backend-var/{backup_name}'],
-            cwd=REPO_ROOT)
+            cwd=REPO_ROOT, capture_output=True, text=True)
         if result.returncode != 0:
-            sys.exit(f'error: could not move {DB_MARKER_FILE} aside')
-    print(f'Backed up the database to {DB_MARKER_FILE.with_name(backup_name)}')
+            sys.exit(f'error: could not move {rel(DB_MARKER_FILE)} aside:\n{result.stderr.strip()}')
+    print(f'Database backed up to {rel(DB_MARKER_FILE.with_name(backup_name))}')
 
 
 def reset_instance(env_file):
     if compose_containers():
-        sys.exit('error: --reset needs this instance\'s containers removed first -- run `docker compose down`')
+        sys.exit('error: containers still exist -- run `docker compose down` first')
     hostname = parse_env_file(env_file).get('CAH_HOSTNAME', '')
-    print(f'This wipes the instance: all homes, users and API tokens in {DB_MARKER_FILE} are lost\n'
-          '(the database is backed up first).')
-    if not hostname or input(f'Type the CAH_HOSTNAME ({hostname}) to confirm: ').strip() != hostname:
+    print('This wipes all homes, users and API tokens (the database is backed up first).')
+    if not hostname or input(f'Type CAH_HOSTNAME ({hostname}) to confirm: ').strip() != hostname:
         sys.exit('Aborted.')
     backup_database()
+
+
+def rel(path):
+    """path relative to the repo root, for shorter messages."""
+    try:
+        return path.resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return path
 
 
 def main():
@@ -245,32 +252,22 @@ def main():
 
     if DB_MARKER_FILE.exists() and DB_MARKER_FILE.stat().st_size > 0:
         if not args.reset:
-            sys.exit(
-                f'error: {DB_MARKER_FILE} is not empty -- this instance has already been initialized.\n'
-                'Fleet size (MAX_HOME_COUNT and friends) is an install-time-only decision; '
-                'changing it now would silently break routing for already-registered homes. '
-                'Run `./setup --reset` to wipe the instance and start over.'
-            )
+            sys.exit('error: instance already initialized, fleet size is locked -- '
+                     '`./setup --reset` wipes it and starts over')
         reset_instance(args.env_file)
 
     generated = render_backends(config)
     new_cfg_text = splice(args.cfg_file.read_text(), generated, args.cfg_file)
     args.cfg_file.write_text(new_cfg_text)
 
-    total = config['MAX_HOME_COUNT'] * config['TUNNEL_PORTS_PER_HOME']
-    print(f'Wrote {total} tunnel_* + {total} http_tunnel_* backend stanzas '
-          f'({config["MAX_HOME_COUNT"]} homes x {config["TUNNEL_PORTS_PER_HOME"]} ports each) to {args.cfg_file}')
-
     tcp_public_port_range = render_tcp_public_port_range(config)
     update_env_var(args.env_file, 'TCP_PUBLIC_PORT_RANGE', tcp_public_port_range)
-    print(f'Set TCP_PUBLIC_PORT_RANGE={tcp_public_port_range} in {args.env_file} '
-          f'(derived from TCP_PUBLIC_PORTS_BASE={config["TCP_PUBLIC_PORTS_BASE"]}, '
-          f'MAX_HOME_COUNT={config["MAX_HOME_COUNT"]}, '
-          f'TCP_PUBLIC_PORTS_PER_HOME={config["TCP_PUBLIC_PORTS_PER_HOME"]})')
 
     args.installed_config_file.write_text(json.dumps(config, indent=2, sort_keys=True) + '\n')
-    print(f'Wrote locked fleet config to {args.installed_config_file} '
-          '(bind-mounted read-only into tunnelagent -- see compose.yaml)')
+
+    print(f'Fleet: {config["MAX_HOME_COUNT"]} homes x {config["TUNNEL_PORTS_PER_HOME"]} tunnel ports, '
+          f'TCP ports {tcp_public_port_range}')
+    print(f'Updated {rel(args.cfg_file)}, {rel(args.env_file)}, {rel(args.installed_config_file)}')
 
 
 if __name__ == '__main__':
