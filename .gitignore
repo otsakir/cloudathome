@@ -9,4 +9,4 @@ __pycache__/
 var
 *.env
 ssh
-/docker/django/fleet_config.json
+/fleet_config.json

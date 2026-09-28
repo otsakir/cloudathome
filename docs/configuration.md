@@ -138,12 +138,13 @@ by the containers. The script:
 1. validates them,
 2. generates the per-port tunnel backends in `docker/haproxy/haproxy.cfg`,
 3. derives `TCP_PUBLIC_PORT_RANGE` and writes it back into `.env`,
-4. writes `docker/django/fleet_config.json`, which is baked into the `django`
-   image at build time. `manage_home.py` (which runs as root) trusts only this
-   root-owned file, never the environment.
+4. writes `fleet_config.json` next to `.env`, which `tunnelagent` mounts
+   read-only. `manage_home.py` (which runs as root) trusts only this file,
+   never the environment.
 
-Run it before the first `docker compose up --build` — the build fails without
-`fleet_config.json`. It refuses to run again once `src/var/db.sqlite3` exists.
+Run it before the first `docker compose up` — `up` fails without
+`fleet_config.json`. The first start then migrates the empty database, creating
+`MAX_HOME_COUNT` home slots; after that the script refuses to run again.
 
 `.env.example` ships a deliberately minimal fleet (2 homes, 5 ports each) —
 size it for your deployment before running the script. A variable left out of

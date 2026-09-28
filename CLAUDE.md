@@ -22,15 +22,18 @@ aborts container startup outright if it's unset (see "Key design points"
 below) — and a TLS cert/key pair must exist at `docker/django/certs/`
 (`fullchain.pem`/`privkey.pem`) for gunicorn's HTTPS process to start.
 
-`docker compose up --build` also needs `python3 scripts/generate_fleet_config.py`
+`docker compose up` also needs `python3 scripts/generate_fleet_config.py`
 to have been run first, once per checkout, after `.env` exists (edit the
 `MAX_HOME_COUNT`/`TUNNEL_PORTS_PER_HOME`/etc. fleet-size vars in `.env` first if you're
 not keeping the defaults — see `docs/configuration.md`). That script
 validates those vars, writes the tunnel backend stanzas into
 `docker/haproxy/haproxy.cfg`, derives `TCP_PUBLIC_PORT_RANGE` back into `.env`,
-and writes `docker/django/fleet_config.json`, which `django.dockerfile` `COPY`s
-into the image — the build fails outright if that file is missing. It refuses to
-run again once `src/var/db.sqlite3` exists, since fleet-size is an install-time-only
+and writes `fleet_config.json` (repo root, next to `.env`, gitignored), which
+`compose.yaml` bind-mounts read-only into `tunnelagent` (`create_host_path: false`,
+so `up` fails outright if it's missing). `entrypoint.sh` runs `migrate` only on
+first start (empty `src/var/db.sqlite3`), which provisions the home slots from that
+file; later schema migrations are run by hand. The script refuses to run again once
+`src/var/db.sqlite3` is non-empty, since fleet-size is an install-time-only
 decision (see "Key design points" below).
 
 All services run via Docker Compose:

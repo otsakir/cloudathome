@@ -16,17 +16,19 @@ TCP_PUBLIC_PORTS_PER_HOME) from .env, validates them, and:
      .env, so it's never a second, independently-hand-set value that can drift
      out of sync with the constants it's derived from.
 
-  3. Writes the validated values to docker/django/fleet_config.json, which
-     django.dockerfile bakes into the django image at build time. This is the
-     only way these values reach manage_home.py -- see its module docstring
-     for why it doesn't read them from the process environment.
+  3. Writes the validated values to fleet_config.json (repo root, next to
+     .env), which compose.yaml bind-mounts read-only into the tunnelagent
+     container. This is the only way these values reach manage_home.py -- see
+     its module docstring for why it doesn't read them from the process
+     environment.
 
 Fleet-size sizing is an install-time-only decision (see CLAUDE.md): there is no
 supported way to change it once homes have registered, since shrinking would
 silently drop routing for homes above the new bound, and growing has never been
 exercised against an already-migrated database. To guard against an accidental
 re-run against a live instance, this script refuses to run once
-src/var/db.sqlite3 exists (created the first time `migrate` runs) -- pass
+src/var/db.sqlite3 is non-empty (migrated on the tunnelagent container's first
+start -- see docker/django/entrypoint.sh) -- pass
 --force only if you are certain (e.g. re-running after editing haproxy.cfg by
 hand, before ever bringing the instance up).
 
@@ -42,7 +44,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_FILE = REPO_ROOT / '.env'
 DEFAULT_CFG_FILE = REPO_ROOT / 'docker' / 'haproxy' / 'haproxy.cfg'
-DEFAULT_INSTALLED_CONFIG_FILE = REPO_ROOT / 'docker' / 'django' / 'fleet_config.json'
+DEFAULT_INSTALLED_CONFIG_FILE = REPO_ROOT / 'fleet_config.json'
 DB_MARKER_FILE = REPO_ROOT / 'src' / 'var' / 'db.sqlite3'
 
 BEGIN_MARKER = '# BEGIN GENERATED BACKENDS'
@@ -209,10 +211,9 @@ def main():
           f'MAX_HOME_COUNT={config["MAX_HOME_COUNT"]}, '
           f'TCP_PUBLIC_PORTS_PER_HOME={config["TCP_PUBLIC_PORTS_PER_HOME"]})')
 
-    args.installed_config_file.parent.mkdir(parents=True, exist_ok=True)
     args.installed_config_file.write_text(json.dumps(config, indent=2, sort_keys=True) + '\n')
     print(f'Wrote locked fleet config to {args.installed_config_file} '
-          '(baked into the django image at build time -- see django.dockerfile)')
+          '(bind-mounted read-only into tunnelagent -- see compose.yaml)')
 
 
 if __name__ == '__main__':

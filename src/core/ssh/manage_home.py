@@ -9,17 +9,18 @@ that only needs to read config, not run privileged operations.
 
 Fleet-size constants (MAX_HOME_COUNT and friends -- see Config) are an
 install-time-only decision (see CLAUDE.md): scripts/generate_fleet_config.py
-validates them once against .env and bakes them into
-INSTALLED_FLEET_CONFIG_PATH, a file built into the django image at
-`docker build` time (see django.dockerfile). Config reads that locked file,
+validates them once against .env and writes them to fleet_config.json, which
+compose.yaml bind-mounts read-only at INSTALLED_FLEET_CONFIG_PATH. Config
+reads that locked file,
 not the process environment. This is deliberate: this script runs as root via
 sudo, invoked by the unprivileged django user's own process
-(ElevatedOperations, in tunnels/services.py); an environment variable is
+(ElevatedOperations, in core/services.py); an environment variable is
 something that process could always override per-call (subprocess.run(env=)
 accepts an arbitrary dict), so trusting os.environ for a privileged decision
 like "how many home slots exist" would make root's bounds only as trustworthy
-as django's own environment. A root-owned file baked into the image at build
-time isn't reachable from that process at all. Local dev and the standalone
+as django's own environment. A read-only bind mount can't be written from
+inside the container at all (remounting needs CAP_SYS_ADMIN, which the
+container doesn't have). Local dev and the standalone
 pytest suite have no such file and fall back to FLEET_DEFAULTS.
 
 Runs as root (via a tightly scoped sudoers rule). Django's ElevatedOperations
@@ -99,8 +100,8 @@ def validate_fleet_config(values):
 
 def _load_installed_fleet_config():
     """Reads the fleet-size values locked in at install time by
-    scripts/generate_fleet_config.py (baked into the image -- see
-    django.dockerfile). Returns None if this process wasn't deployed via that
+    scripts/generate_fleet_config.py (bind-mounted read-only -- see
+    compose.yaml). Returns None if this process wasn't deployed via that
     install step; callers fall back to FLEET_DEFAULTS in that case.
     """
     try:

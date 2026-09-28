@@ -27,25 +27,28 @@ cp .env.example .env
 
 See [configuration reference](docs/configuration.md) for a detailed reference of all environmental variables supported.
 
-By default, both Django (website/API) and homes' public endpoints listen on
-ports 80/443. Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` or `HTTP_INBOUND_DEFAULT_PORT`/
-`HTTPS_INBOUND_DEFAULT_PORT`. This is also how you run more than one CloudAtHome instance
-on the same host — see
-[Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host)
-for more on this.
+Two difference services are exposed by this system. The cloudathome website/portal + API and the reverse proxy 
+entry points that forwards to home services.  
 
-**Two more things matter before you're actually done**:
+#### Cloudathome website/portal & API
 
-1. Set `CAH_HOSTNAME` in `.env` to a real hostname you control — this is the
-   only way to reach Django (admin/API/web UI); `tunnelagent` refuses to
-   **start at all** without it.
-2. Drop a TLS cert/key pair at `docker/django/certs/fullchain.pem` and
-   `docker/django/certs/privkey.pem` — gunicorn terminates `CAH_HOSTNAME`'s
-   HTTPS with these (no ACME automation; see
-   [docker/django/certs/README.md](docker/django/certs/README.md) for where
-   to get one, including a self-signed option for local testing). Unlike
-   `CAH_HOSTNAME`, this one doesn't block startup — without it, Django stays
-   reachable over plain HTTP, just without HTTPS.
+Tweak `CAH_HTTP_PORT`/`CAH_HTTPS_PORT` to set up public ports for the website and API. By default 80/443 ports are used.
+Also set `CAH_HOSTNAME` (obligatory) to the hostname you want the portal/api to listen to. This will allow haproxy to properly
+demultiplex arriving requests to the portal container instead of the homes services. For TLS support, drop a TLS 
+cert/key pair at `docker/django/certs/fullchain.pem` and `docker/django/certs/privkey.pem`. If not found, Django will
+use plaintext http. 
+
+#### Reverse proxy entry points
+
+Similarly, tweak `HTTP_INBOUND_DEFAULT_PORT`/`HTTPS_INBOUND_DEFAULT_PORT` to set up the ports that will forward web 
+traffic to the homes. Again, 80/443 ports will be used by default.
+
+Important
+
+* Properly setting up the port values above allow running multiple server instances on the same host machine. See
+[Running more than one instance on the same host](docs/features.md#running-more-than-one-instance-on-the-same-host) for more on this.
+* Using the same ports for the website/portal and the reverse proxy entry points will work just fine.
+
 
 See [Routing Django's admin/API through HAProxy](docs/features.md#routing-djangos-adminapi-through-haproxy)
 for the full picture.
@@ -64,8 +67,8 @@ python3 scripts/generate_fleet_config.py
 
 This validates those settings, writes the per-home backend definitions into
 `docker/haproxy/haproxy.cfg`, derives `TCP_PUBLIC_PORT_RANGE` in `.env` from them,
-and writes `docker/django/fleet_config.json`, which the build below bakes into the
-`tunnelagent` image — the build fails if this hasn't been run first.
+and writes `fleet_config.json` next to `.env`, which `tunnelagent` mounts
+read-only — `docker compose up` fails if this hasn't been run first.
 
 _In case you have already initialized the instance, you will need to reset it by removing `src/var/db.sqlite3` first._
 
@@ -81,18 +84,22 @@ This starts two containers:
 
 HAProxy must pass its health check before `tunnelagent` starts.
 
-### Initialize Django (first time only)
-
-```bash
-docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py migrate
-docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
-```
-
-The `migrate` step also provisions this instance's home slots automatically via the data migration `core/migrations/0003_provision_homes.py`, sized to whatever `MAX_HOME_COUNT` was locked in at step 2 (10 by default) — fixed for the life of this instance, per the fleet-size note above.
+On its very first start (empty database), `tunnelagent` runs `migrate` itself. That
+also provisions this instance's home slots via the data migration
+`core/migrations/0003_provision_homes.py`, sized to the `MAX_HOME_COUNT` in
+`fleet_config.json` — fixed for the life of this instance, per the fleet-size note above.
+Later restarts don't migrate; after upgrading to a version with new migrations, run
+`manage.py migrate` by hand (as below).
 
 The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 
-Steps 1, 2, and 4 only apply to a fresh checkout — restarting an existing instance is just `docker compose -f compose.yaml up`.
+### Create an admin user (first time only)
+
+```bash
+docker compose -f compose.yaml exec tunnelagent python /opt/app/manage.py createsuperuser
+```
+
+Restarting an existing instance is just `docker compose -f compose.yaml up`.
 
 Once running (substituting your `CAH_HOSTNAME`):
 
