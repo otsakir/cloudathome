@@ -35,7 +35,8 @@ The `chmod` matters: `openssl req` writes the key `0600`, owned by you; since th
 ### 2. Start the cloud stack
 
 ```bash
-python3 scripts/generate_fleet_config.py
+cp fleet.env.example fleet.env
+./setup
 docker compose -f compose.yaml up --build
 ```
 

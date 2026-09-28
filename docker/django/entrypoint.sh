@@ -10,7 +10,7 @@ chown -R django:django /opt/backend-var
 # first start only: create the schema and provision MAX_HOME_COUNT home slots
 # (core/migrations/0003_provision_homes.py) from the mounted fleet_config.json.
 # Later schema upgrades are a manual `manage.py migrate`. Same "empty DB"
-# test scripts/generate_fleet_config.py uses to decide it may still run.
+# test ./setup uses to decide it may still run.
 if [ ! -s /opt/backend-var/db.sqlite3 ]; then
   echo "Empty database -- running first-start migrate"
   su-exec django python /opt/app/manage.py migrate --noinput

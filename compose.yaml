@@ -55,7 +55,7 @@ services:
       CAH_SSH_PORT: "${CAH_SSH_PORT}"
       HAPROXY_API_PORT: "${HAPROXY_API_PORT}"
       # MAX_HOME_COUNT and friends (fleet-size sizing) are intentionally not passed
-      # here -- scripts/generate_fleet_config.py writes them to fleet_config.json
+      # here -- ./setup writes them to fleet_config.json
       # instead, mounted read-only below. See core/ssh/manage_home.py's module
       # docstring for why.
     cap_add:
@@ -67,7 +67,7 @@ services:
       # with (fullchain.pem/privkey.pem) -- no ACME automation, drop files here
       # manually. Only reachable via HAProxy, never published directly.
       - ./docker/django/certs:/etc/cloudathome/certs:ro
-      # Fleet-size config locked at install time by scripts/generate_fleet_config.py.
+      # Fleet-size config locked at install time by ./setup.
       # Read-only, so nothing inside the container (not even root -- no
       # CAP_SYS_ADMIN to remount) can change what manage_home.py trusts.
       # create_host_path: false makes `up` fail if the script hasn't been run,

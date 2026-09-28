@@ -56,13 +56,14 @@ for the full picture.
 ### Configure installation capacity
 
 Next, configure the instance capacity. The number of homes allowed to register and the number
-of proxied ports per home (`MAX_HOME_COUNT`, `TUNNEL_PORTS_PER_HOME`, and friends; `.env.example` starts
-with a minimal 2 homes × 5 ports). **This is an install-time-only decision — there's no supported way to
-change it once homes have registered** — so decide it now if the defaults don't
-fit, then lock it in:
+of proxied ports per home (`MAX_HOME_COUNT`, `TUNNEL_PORTS_PER_HOME`, and friends) live in their own
+file, `fleet.env`; `fleet.env.example` starts with a minimal 2 homes × 5 ports. **This is an
+install-time-only decision — there's no supported way to change it once homes have registered** — so
+decide it now if the defaults don't fit, then lock it in:
 
 ```bash
-python3 scripts/generate_fleet_config.py
+cp fleet.env.example fleet.env
+./setup
 ```
 
 This validates those settings, writes the per-home backend definitions into
@@ -70,7 +71,9 @@ This validates those settings, writes the per-home backend definitions into
 and writes `fleet_config.json` next to `.env`, which `tunnelagent` mounts
 read-only — `docker compose up` fails if this hasn't been run first.
 
-_In case you have already initialized the instance, you will need to reset it by removing `src/var/db.sqlite3` first._
+Once the instance has started, `./setup` refuses to run again. To start over, run `docker compose down`
+and then `./setup --reset`: this wipes all homes, users and tokens (the database is backed up to
+`src/var/db.sqlite3.bak-<timestamp>` first).
 
 ### Build and start the stack
 

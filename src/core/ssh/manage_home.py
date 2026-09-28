@@ -8,8 +8,8 @@ module-level `tunnel_manager` singleton, imported in-process by Django code
 that only needs to read config, not run privileged operations.
 
 Fleet-size constants (MAX_HOME_COUNT and friends -- see Config) are an
-install-time-only decision (see CLAUDE.md): scripts/generate_fleet_config.py
-validates them once against .env and writes them to fleet_config.json, which
+install-time-only decision (see CLAUDE.md): ./setup (repo root)
+validates them once from fleet.env and writes them to fleet_config.json, which
 compose.yaml bind-mounts read-only at INSTALLED_FLEET_CONFIG_PATH. Config
 reads that locked file,
 not the process environment. This is deliberate: this script runs as root via
@@ -59,8 +59,8 @@ def _run(args, **kwargs):
     return subprocess.run(args, **kwargs)
 
 
-# Fleet-size defaults -- the single copy scripts/generate_fleet_config.py also
-# imports (from this module) for its own .env parsing, so the two never hand-drift
+# Fleet-size defaults -- the single copy ./setup also
+# imports (from this module) for its own fleet.env parsing, so the two never hand-drift
 # apart. Only used as a fallback when INSTALLED_FLEET_CONFIG_PATH doesn't exist
 # (local dev, the standalone pytest suite) -- see the module docstring above.
 FLEET_DEFAULTS = {
@@ -100,7 +100,7 @@ def validate_fleet_config(values):
 
 def _load_installed_fleet_config():
     """Reads the fleet-size values locked in at install time by
-    scripts/generate_fleet_config.py (bind-mounted read-only -- see
+    ./setup (bind-mounted read-only -- see
     compose.yaml). Returns None if this process wasn't deployed via that
     install step; callers fall back to FLEET_DEFAULTS in that case.
     """

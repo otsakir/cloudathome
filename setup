@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Materializes fleet-size-derived install artifacts from .env.
+"""One-time instance setup: locks in fleet size and materializes what depends on it.
 
 Reads the fleet-size settings (MAX_HOME_COUNT, TUNNEL_PORTS_PER_HOME,
 TUNNEL_PORTS_PER_HOME_RESERVED, TUNNEL_PORTS_BASE, TCP_PUBLIC_PORTS_BASE,
-TCP_PUBLIC_PORTS_PER_HOME) from .env, validates them, and:
+TCP_PUBLIC_PORTS_PER_HOME) from fleet.env, validates them, and:
 
   1. Writes the `backend tunnel_<port>` / `backend http_tunnel_<port>` stanzas
      -- one pair per SSH tunnel port, for every home -- between the
@@ -12,9 +12,9 @@ TCP_PUBLIC_PORTS_PER_HOME) from .env, validates them, and:
      defaults, the default backends) is left untouched.
 
   2. Derives TCP_PUBLIC_PORT_RANGE (= TCP_PUBLIC_PORTS_BASE spanning
-     MAX_HOME_COUNT * TCP_PUBLIC_PORTS_PER_HOME ports) and writes it back into
-     .env, so it's never a second, independently-hand-set value that can drift
-     out of sync with the constants it's derived from.
+     MAX_HOME_COUNT * TCP_PUBLIC_PORTS_PER_HOME ports) and writes it into
+     .env, where compose.yaml needs it, so it's never a second,
+     independently-hand-set value that can drift out of sync.
 
   3. Writes the validated values to fleet_config.json (repo root, next to
      .env), which compose.yaml bind-mounts read-only into the tunnelagent
@@ -22,27 +22,32 @@ TCP_PUBLIC_PORTS_PER_HOME) from .env, validates them, and:
      its module docstring for why it doesn't read them from the process
      environment.
 
-Fleet-size sizing is an install-time-only decision (see CLAUDE.md): there is no
+fleet.env is read only by this script; .env holds the settings the containers
+read. Fleet size is an install-time-only decision (see CLAUDE.md): there is no
 supported way to change it once homes have registered, since shrinking would
 silently drop routing for homes above the new bound, and growing has never been
-exercised against an already-migrated database. To guard against an accidental
-re-run against a live instance, this script refuses to run once
-src/var/db.sqlite3 is non-empty (migrated on the tunnelagent container's first
-start -- see docker/django/entrypoint.sh) -- pass
---force only if you are certain (e.g. re-running after editing haproxy.cfg by
-hand, before ever bringing the instance up).
+exercised against an already-migrated database. So this script refuses to run
+once src/var/db.sqlite3 is non-empty (migrated on the tunnelagent container's
+first start -- see docker/django/entrypoint.sh), unless --reset is given:
+that backs the database up to src/var/db.sqlite3.bak-<timestamp> and starts
+the instance over. --reset requires all of this instance's containers to be
+removed (`docker compose down`) first.
 
 Usage:
-    python3 scripts/generate_fleet_config.py
+    ./setup
+    ./setup --reset
 """
 import argparse
 import json
 import re
+import subprocess
 import sys
+import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_ENV_FILE = REPO_ROOT / '.env'
+DEFAULT_FLEET_ENV_FILE = REPO_ROOT / 'fleet.env'
 DEFAULT_CFG_FILE = REPO_ROOT / 'docker' / 'haproxy' / 'haproxy.cfg'
 DEFAULT_INSTALLED_CONFIG_FILE = REPO_ROOT / 'fleet_config.json'
 DB_MARKER_FILE = REPO_ROOT / 'src' / 'var' / 'db.sqlite3'
@@ -81,11 +86,16 @@ RENAMED_KEYS = {
 }
 
 
-def load_config(env_file):
-    env_values = parse_env_file(env_file)
+def load_config(fleet_env_file, env_file):
+    # Fleet settings used to live in .env -- one still left there would
+    # otherwise be silently ignored in favour of fleet.env.
+    misplaced = [key for key in [*DEFAULTS, *RENAMED_KEYS] if key in parse_env_file(env_file)]
+    if misplaced:
+        sys.exit(f'error: {env_file}: move these variables to {fleet_env_file.name}: {", ".join(misplaced)}')
+    env_values = parse_env_file(fleet_env_file)
     stale = [f'{old} -> {new}' for old, new in RENAMED_KEYS.items() if old in env_values]
     if stale:
-        sys.exit(f'error: {env_file}: rename these variables: {", ".join(stale)}')
+        sys.exit(f'error: {fleet_env_file}: rename these variables: {", ".join(stale)}')
     config = {}
     for key, default in DEFAULTS.items():
         raw = env_values.get(key)
@@ -95,7 +105,7 @@ def load_config(env_file):
         try:
             config[key] = int(raw)
         except ValueError:
-            sys.exit(f'error: {env_file}: {key}={raw!r} is not an integer')
+            sys.exit(f'error: {fleet_env_file}: {key}={raw!r} is not an integer')
     return config
 
 
@@ -164,25 +174,59 @@ def update_env_var(env_file, key, value):
     env_file.write_text('\n'.join(lines) + '\n')
 
 
+def compose_containers():
+    """IDs of this instance's containers, running or stopped."""
+    try:
+        result = subprocess.run(['docker', 'compose', 'ps', '-a', '-q'], cwd=REPO_ROOT,
+                                capture_output=True, text=True)
+    except FileNotFoundError:
+        sys.exit('error: --reset needs the docker CLI to check for running containers')
+    if result.returncode != 0:
+        sys.exit(f'error: `docker compose ps` failed:\n{result.stderr.strip()}')
+    return result.stdout.split()
+
+
+def backup_database():
+    """Moves the database aside. src/var/ is owned by the container's django
+    user (entrypoint.sh chowns it), so the host user usually can't rename it
+    directly -- fall back to doing it from a throwaway tunnelagent container."""
+    backup_name = f'{DB_MARKER_FILE.name}.bak-{time.strftime("%Y%m%d-%H%M%S")}'
+    try:
+        DB_MARKER_FILE.rename(DB_MARKER_FILE.with_name(backup_name))
+    except PermissionError:
+        result = subprocess.run(
+            ['docker', 'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'mv', 'tunnelagent',
+             f'/opt/backend-var/{DB_MARKER_FILE.name}', f'/opt/backend-var/{backup_name}'],
+            cwd=REPO_ROOT)
+        if result.returncode != 0:
+            sys.exit(f'error: could not move {DB_MARKER_FILE} aside')
+    print(f'Backed up the database to {DB_MARKER_FILE.with_name(backup_name)}')
+
+
+def reset_instance(env_file):
+    if compose_containers():
+        sys.exit('error: --reset needs this instance\'s containers removed first -- run `docker compose down`')
+    hostname = parse_env_file(env_file).get('CAH_HOSTNAME', '')
+    print(f'This wipes the instance: all homes, users and API tokens in {DB_MARKER_FILE} are lost\n'
+          '(the database is backed up first).')
+    if not hostname or input(f'Type the CAH_HOSTNAME ({hostname}) to confirm: ').strip() != hostname:
+        sys.exit('Aborted.')
+    backup_database()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--env-file', type=Path, default=DEFAULT_ENV_FILE,
                          help=f'default: {DEFAULT_ENV_FILE}')
+    parser.add_argument('--fleet-env-file', type=Path, default=DEFAULT_FLEET_ENV_FILE,
+                         help=f'default: {DEFAULT_FLEET_ENV_FILE}')
     parser.add_argument('--cfg-file', type=Path, default=DEFAULT_CFG_FILE,
                          help=f'default: {DEFAULT_CFG_FILE}')
     parser.add_argument('--installed-config-file', type=Path, default=DEFAULT_INSTALLED_CONFIG_FILE,
                          help=f'default: {DEFAULT_INSTALLED_CONFIG_FILE}')
-    parser.add_argument('--force', action='store_true',
-                         help='skip the already-initialized guard (dangerous -- see CLAUDE.md)')
+    parser.add_argument('--reset', action='store_true',
+                         help='wipe an already-initialized instance (database backed up first) and set it up again')
     args = parser.parse_args()
-
-    if DB_MARKER_FILE.exists() and DB_MARKER_FILE.stat().st_size > 0 and not args.force:
-        sys.exit(
-            f'error: {DB_MARKER_FILE} already exists -- this instance has already been initialized.\n'
-            'Fleet-size sizing (MAX_HOME_COUNT and friends) is an install-time-only decision; '
-            'changing it now would silently break routing for already-registered homes. '
-            'See CLAUDE.md. Pass --force only if you are certain.'
-        )
 
     if not args.cfg_file.exists():
         sys.exit(f'error: {args.cfg_file} not found')
@@ -190,11 +234,24 @@ def main():
     if not args.env_file.exists():
         sys.exit(f'error: {args.env_file} not found -- copy .env.example to .env first')
 
-    config = load_config(args.env_file)
+    if not args.fleet_env_file.exists():
+        sys.exit(f'error: {args.fleet_env_file} not found -- copy fleet.env.example to fleet.env first')
+
+    config = load_config(args.fleet_env_file, args.env_file)
     try:
         validate_fleet_config(config)
     except FleetConfigError as e:
-        sys.exit(f'error: {args.env_file}: {e}')
+        sys.exit(f'error: {args.fleet_env_file}: {e}')
+
+    if DB_MARKER_FILE.exists() and DB_MARKER_FILE.stat().st_size > 0:
+        if not args.reset:
+            sys.exit(
+                f'error: {DB_MARKER_FILE} is not empty -- this instance has already been initialized.\n'
+                'Fleet size (MAX_HOME_COUNT and friends) is an install-time-only decision; '
+                'changing it now would silently break routing for already-registered homes. '
+                'Run `./setup --reset` to wipe the instance and start over.'
+            )
+        reset_instance(args.env_file)
 
     generated = render_backends(config)
     new_cfg_text = splice(args.cfg_file.read_text(), generated, args.cfg_file)

@@ -1,6 +1,8 @@
 # Configuration reference
 
-An instance is configured through the root `.env` file (`cp .env.example .env`).
+An instance is configured through the root `.env` file (`cp .env.example .env`),
+plus `fleet.env` (`cp fleet.env.example fleet.env`) for the install-time-only
+fleet size, which only `./setup` reads.
 `docker compose` substitutes these variables into `compose.yaml`, which in turn
 passes them to the containers; HAProxy expands them in `haproxy.cfg`'s `bind`
 lines, and Django reads them in `config/settings/local_settings.py`.
@@ -10,8 +12,8 @@ Variables fall into three groups:
 | Group | Meaning |
 |---|---|
 | [Changeable](#changeable-after-install) | May be edited after install; takes effect on container recreate |
-| [Install-time only](#install-time-only-fleet-size) | Fixed for the life of the instance; changing them means a fresh install |
-| [Calculated](#calculated) | Written by `scripts/generate_fleet_config.py`; don't edit by hand |
+| [Install-time only](#install-time-only-fleet-size) | In `fleet.env`. Fixed for the life of the instance; changing them means `./setup --reset` |
+| [Calculated](#calculated) | Written into `.env` by `./setup`; don't edit by hand |
 
 ## Applying changes
 
@@ -132,8 +134,8 @@ cross-home overlap checks still apply. Leave it off on a real deployment.
 ## Install-time only (fleet size)
 
 These size the fleet: how many homes the instance holds and how ports are laid
-out per home. They're read **only** by `scripts/generate_fleet_config.py`, never
-by the containers. The script:
+out per home. They live in `fleet.env` and are read **only** by `./setup`, never
+by the containers (`./setup` errors if one is still in `.env`). The script:
 
 1. validates them,
 2. generates the per-port tunnel backends in `docker/haproxy/haproxy.cfg`,
@@ -144,19 +146,22 @@ by the containers. The script:
 
 Run it before the first `docker compose up` — `up` fails without
 `fleet_config.json`. The first start then migrates the empty database, creating
-`MAX_HOME_COUNT` home slots; after that the script refuses to run again.
+`MAX_HOME_COUNT` home slots; after that the script refuses to run again, and
+editing `fleet.env` has no effect.
 
-`.env.example` ships a deliberately minimal fleet (2 homes, 5 ports each) —
+`fleet.env.example` ships a deliberately minimal fleet (2 homes, 5 ports each) —
 size it for your deployment before running the script. A variable left out of
-`.env` falls back to the built-in default in `manage_home.py`'s `FLEET_DEFAULTS`
+`fleet.env` falls back to the built-in default in `manage_home.py`'s `FLEET_DEFAULTS`
 (shown in the tables below), which is also what local dev and the test suites
 use.
 
 There is no supported way to change these once homes are registered: shrinking
 silently breaks routing for homes above the new bound, and growing is untested
-against an existing database. A real change means a fresh install.
+against an existing database. A real change means starting over: `docker compose
+down`, then `./setup --reset`, which backs up and removes the database (all homes,
+users and tokens) before regenerating.
 
-#### `MAX_HOME_COUNT` (`.env.example`: 2, built-in default: 10)
+#### `MAX_HOME_COUNT` (`fleet.env.example`: 2, built-in default: 10)
 
 How many home slots the instance holds (indices `0..MAX_HOME_COUNT-1`).
 
@@ -169,7 +174,7 @@ Never published on the host — they only need to avoid `tunnelagent`'s own
 listeners (22, 8000, 8001). Homes learn their block from the API (`port_base`,
 `port_count`).
 
-| Variable | `.env.example` | Built-in default | Meaning |
+| Variable | `fleet.env.example` | Built-in default | Meaning |
 |---|---|---|---|
 | `TUNNEL_PORTS_BASE` | 2000 | 2000 | Home 0's first tunnel port |
 | `TUNNEL_PORTS_PER_HOME` | 5 | 10 | Tunnel ports per home — one per active mapping, so also the max mappings per home |
@@ -181,7 +186,7 @@ Published on the host. Each home gets a dedicated block for raw TCP forwards
 (routed by port alone, hence per-home rather than shared). Homes learn their
 block from the API (`tcp_port_base`, `tcp_port_count`).
 
-| Variable | `.env.example` | Built-in default | Meaning |
+| Variable | `fleet.env.example` | Built-in default | Meaning |
 |---|---|---|---|
 | `TCP_PUBLIC_PORTS_BASE` | 10000 | 10000 | Home 0's first public TCP port |
 | `TCP_PUBLIC_PORTS_PER_HOME` | 5 | 10 | Public TCP ports per home |
@@ -192,6 +197,6 @@ block from the API (`tcp_port_base`, `tcp_port_count`).
 
 The full public TCP range, in `base-max` form:
 `TCP_PUBLIC_PORTS_BASE` to `TCP_PUBLIC_PORTS_BASE + MAX_HOME_COUNT × TCP_PUBLIC_PORTS_PER_HOME − 1`.
-Written into `.env` by `scripts/generate_fleet_config.py`; HAProxy binds it and
+Written into `.env` by `./setup`; HAProxy binds it and
 `compose.yaml` publishes it. Don't edit it by hand — change the variables it's
 derived from (at install time) and rerun the script.
