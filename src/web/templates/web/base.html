@@ -9,7 +9,8 @@
   <nav>
     <a href="{% url 'landing' %}">Home</a>
     {% if user.is_authenticated %}
-      | <a href="{% url 'dashboard' %}">Dashboard</a>
+      {% if is_homeowner %}| <a href="{% url 'dashboard' %}">Dashboard</a>{% endif %}
+      {% if user.is_staff %}| <a href="{% url 'admin:index' %}">Admin</a>{% endif %}
       | <strong>{{ user.username }}</strong>
       | <form method="post" action="{% url 'logout' %}" style="display:inline">
           {% csrf_token %}

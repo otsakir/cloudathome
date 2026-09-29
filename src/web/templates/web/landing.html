@@ -13,9 +13,18 @@
   cloud server. Incoming HTTPS requests are routed by hostname through the tunnel
   directly to your home service.
 </p>
+{% if user.is_authenticated %}
+<h2>Welcome back, {{ user.username }}</h2>
+<ul>
+  {% if is_homeowner %}<li><a href="{% url 'dashboard' %}">Go to your dashboard</a></li>{% endif %}
+  {% if user.is_staff %}<li><a href="{% url 'admin:index' %}">Django admin</a></li>{% endif %}
+  <li><a href="{% url 'guides' %}">Guides</a></li>
+</ul>
+{% else %}
 <h2>Get started</h2>
 <ul>
   <li><a href="{% url 'signup' %}">Create an account</a></li>
   <li><a href="{% url 'login' %}">Log in</a></li>
 </ul>
+{% endif %}
 {% endblock %}
