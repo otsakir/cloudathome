@@ -1,5 +1,6 @@
 import subprocess
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User, Group
@@ -12,7 +13,7 @@ from core.models import Home
 from core.services import ElevatedOperations, HAProxyService, release_home
 from core.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, UpdatePublicKeyForm
-from web.services import HomeConfigService
+from web.services import HomeConfigService, cloudserver_url, ssh_host
 
 
 class HomeOwnerMixin(LoginRequiredMixin):
@@ -68,14 +69,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         home = Home.objects.filter(user=self.request.user).first()
         context['home'] = home
-        context['ssh_host'] = self.request.get_host().split(':')[0]
+        context['cloudserver_url'] = cloudserver_url(self.request)
+        context['ssh_host'] = ssh_host(self.request)
+        context['ssh_port'] = settings.CAH_SSH_PORT
         if home:
             port_base = tunnel_manager.get_home_port_base(home.home_index)
             context['home_port_base'] = port_base
             context['mappings'] = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.TUNNEL_PORTS_PER_HOME)
-        else:
-            context['has_token'] = HomeConfigService.has_token(self.request.user)
-            context['cloudserver_url'] = self.request.build_absolute_uri('/').rstrip('/')
         return context
 
 
@@ -146,7 +146,7 @@ class RotateTokenView(HomeOwnerMixin, TemplateView):
         return render(request, 'web/token_rotated.html', {
             'home': home,
             'token': token.key,
-            'cloudserver_url': request.build_absolute_uri('/').rstrip('/'),
+            'cloudserver_url': cloudserver_url(request),
         })
 
 

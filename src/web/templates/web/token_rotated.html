@@ -13,8 +13,10 @@
 {% else %}
   <p>
     Copy this token now — it won't be shown again. Use it to
-    register a home from your home machine.
+    register a home from your home machine:
   </p>
+  <pre><code>python cah.py register [provider-slug] --cloudserver-url {{ cloudserver_url }} --token {{ token }}</code></pre>
+  <p>The token on its own:</p>
 {% endif %}
 
 <textarea readonly rows="1" cols="50">{{ token }}</textarea>
