@@ -57,8 +57,8 @@ for the full picture.
 ### Configure installation capacity
 
 The capacity of the service regarding maximum number of homes and ports supported is controlled through `fleet.env`,
-a separate .env file. Copy fleet.env.example over to fleet.env and tweak`MAX_HOME_COUNT`, `TUNNEL_PORTS_PER_HOME`. 
-Note, **this is an setup-time-only decision — there's no supported way to change it once homes have registered** without
+a separate .env file. Copy fleet.env.example over to fleet.env and tweak `MAX_HOME_COUNT`, `TUNNEL_PORTS_PER_HOME`. 
+Note, **this is a setup-time-only decision — there's no supported way to change it once homes have registered** without
 clearing the database.
 
 Make up your mind, then lock it in:
@@ -108,12 +108,12 @@ docker compose -f compose.yaml exec -u django tunnelagent python /opt/app/manage
 
 ### Accessing the website and API
 
-Once running, access the website/ports, django administrator or the RESTfull API :
+Once running, access the website/ports, django administrator or the RESTful API:
 
 ```commandline
 Website/portal:     http(s)://<CAH_HOSTNAME[:CAH_HTTP(S)_PORT]>
 Django admin:       http(s)://<CAH_HOSTNAME[:CAH_HTTP(S)_PORT]>/admin/login/
-Swagger UI:         http(s)://<CAH_HOSTNAME[:CAH_HTTP(S)_PORT>/api/schema/swagger/
+Swagger UI:         http(s)://<CAH_HOSTNAME[:CAH_HTTP(S)_PORT]>/api/schema/swagger/
 ```
 
 Swagger is only served while django `DEBUG` setting is on, which the Docker settings currently inherit from local dev.
