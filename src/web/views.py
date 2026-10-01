@@ -74,8 +74,22 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context['ssh_port'] = settings.CAH_SSH_PORT
         if home:
             port_base = tunnel_manager.get_home_port_base(home.home_index)
-            context['home_port_base'] = port_base
-            context['mappings'] = HAProxyService.get_home_mappings(port_base, tunnel_manager.config.TUNNEL_PORTS_PER_HOME)
+            port_count = tunnel_manager.config.TUNNEL_PORTS_PER_HOME
+            mappings = HAProxyService.get_home_mappings(
+                port_base,
+                port_count,
+                tcp_public_port_base=tunnel_manager.get_home_tcp_public_port_base(home.home_index),
+                tcp_public_port_count=tunnel_manager.config.TCP_PUBLIC_PORTS_PER_HOME,
+            )
+            tcp_ports = {m['tunnel_port'] for m in mappings if m['scheme'] == 'tcp'}
+            http_ports = {m['tunnel_port'] for m in mappings if m['scheme'] != 'tcp'}
+            context['mappings'] = mappings
+            context['tunnel_port_first'] = port_base
+            context['tunnel_port_last'] = port_base + port_count - 1
+            context['tunnel_port_count'] = port_count
+            context['tunnel_ports_used'] = len(tcp_ports | http_ports)
+            context['tunnel_ports_used_tcp'] = len(tcp_ports)
+            context['tunnel_ports_used_http'] = len(http_ports)
         return context
 
 

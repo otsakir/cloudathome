@@ -18,8 +18,7 @@
   <table>
     <tr><th>Home index</th><td>{{ home.home_index }}</td></tr>
     <tr><th>SSH username</th><td>{{ home.get_username }}</td></tr>
-    <tr><th>Port base</th><td>{{ home_port_base }}</td></tr>
-    <tr><th>Port count</th><td>10</td></tr>
+    <tr><th>Tunnel ports</th><td>{{ tunnel_port_first }}–{{ tunnel_port_last }} ({{ tunnel_ports_used }} of {{ tunnel_port_count }} in use{% if tunnel_ports_used %}: {{ tunnel_ports_used_http }} http/https, {{ tunnel_ports_used_tcp }} tcp{% endif %})</td></tr>
   </table>
   <p>
     <a href="{% url 'edit_home' %}">Update public key</a>

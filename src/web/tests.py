@@ -81,3 +81,46 @@ class ConnectionDetailsTests(TestCase):
         response = self.client.post(reverse('rotate_token'), HTTP_HOST='cloud.example.com')
         token = response.context['token']
         self.assertContains(response, f'--cloudserver-url http://cloud.example.com --token {token}')
+
+
+@override_settings(CAH_HOSTNAME='cloud.example.com', CAH_HTTP_PORT=80, CAH_SSH_PORT=8022,
+                   ALLOWED_HOSTS=['cloud.example.com'])
+class DashboardTunnelPortsTests(TestCase):
+    def setUp(self):
+        from unittest.mock import patch
+        from core.models import Home
+        from core.ssh.manage_home import tunnel_manager
+        patcher = patch('web.services.HAProxyService.https_available', return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.user = User.objects.create_user('alice', password='pw')
+        self.user.groups.add(Group.objects.get(name='homeowner'))
+        self.client.force_login(self.user)
+        Home.objects.filter(home_index=0).update(user=self.user, slug='s')
+        self.config = tunnel_manager.config
+        self.port_base = tunnel_manager.get_home_port_base(0)
+        self.tcp_base = tunnel_manager.get_home_tcp_public_port_base(0)
+        self.other_port_base = tunnel_manager.get_home_port_base(1)
+
+    def get_dashboard(self, entries):
+        from unittest.mock import patch
+        with patch('core.services.HAProxyService.dump_mappings', return_value=entries):
+            return self.client.get(reverse('dashboard'), HTTP_HOST='cloud.example.com')
+
+    def test_shows_range_and_usage_breakdown(self):
+        b = self.port_base
+        response = self.get_dashboard([
+            {'host': 'a.example.com', 'public_port': 443, 'backend': f'tunnel_{b}', 'scheme': 'https'},
+            {'host': 'a.example.com', 'public_port': 80, 'backend': f'http_tunnel_{b + 1}', 'scheme': 'http'},
+            {'public_port': self.tcp_base, 'backend': f'tunnel_{b + 2}', 'scheme': 'tcp'},
+            {'host': 'b.example.com', 'public_port': 443, 'backend': f'tunnel_{self.other_port_base}', 'scheme': 'https'},
+        ])
+        last = b + self.config.TUNNEL_PORTS_PER_HOME - 1
+        self.assertContains(
+            response,
+            f'{b}–{last} (3 of {self.config.TUNNEL_PORTS_PER_HOME} in use: 2 http/https, 1 tcp)',
+        )
+
+    def test_shows_zero_usage_without_breakdown(self):
+        response = self.get_dashboard([])
+        self.assertContains(response, f'(0 of {self.config.TUNNEL_PORTS_PER_HOME} in use)')
