@@ -96,11 +96,7 @@ class HomeDestroyCascadeTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='alice', password='pw')
         self.token = Token.objects.create(user=self.user)
-        # home_index 0 is already provisioned by migration 0003_provision_homes; claim it.
-        self.home = Home.objects.get(home_index=0)
-        self.home.user = self.user
-        self.home.public_key = 'ssh-ed25519 AAAA...'
-        self.home.slug = 'testslug'
+        self.home = Home(home_index=0, user=self.user, public_key='ssh-ed25519 AAAA...', slug='testslug')
         self.home.bandwidth_limit_kbps = 5000
         self.home.save()
         HomeBaseDomain.objects.create(home=self.home, domain='example.com')
@@ -126,12 +122,8 @@ class HomeDestroyCascadeTest(TestCase):
         mock_remove_tcp.assert_called_once_with(10000)
         mock_remove_user.assert_called_once()
 
-        self.home.refresh_from_db()
-        self.assertIsNone(self.home.user)
-        self.assertIsNone(self.home.slug)
-        self.assertIsNone(self.home.public_key)
-        self.assertIsNone(self.home.bandwidth_limit_kbps)
-        self.assertEqual(self.home.base_domains.count(), 0)
+        self.assertFalse(Home.objects.filter(home_index=0).exists())
+        self.assertFalse(HomeBaseDomain.objects.exists())
 
     @patch('api.views.ElevatedOperations.remove_home_user')
     @patch('api.views.HAProxyService.get_home_mappings', return_value=[])

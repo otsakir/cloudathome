@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            homes = list(Home.objects.filter(user__isnull=False).select_related('user'))
+            homes = list(Home.objects.select_related('user'))
         except (OperationalError, ProgrammingError):
             self.stdout.write('Database not ready, skipping reconciliation')
             return

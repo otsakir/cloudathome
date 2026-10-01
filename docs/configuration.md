@@ -145,9 +145,8 @@ by the containers (`./setup` errors if one is still in `.env`). The script:
    never the environment.
 
 Run it before the first `docker compose up` — `up` fails without
-`fleet_config.json`. The first start then migrates the empty database, creating
-`MAX_HOME_COUNT` home slots; after that the script refuses to run again, and
-editing `fleet.env` has no effect.
+`fleet_config.json`. The first start then migrates the empty database; after
+that the script refuses to run again, and editing `fleet.env` has no effect.
 
 `fleet.env.example` ships a deliberately minimal fleet (2 homes, 5 ports each) —
 size it for your deployment before running the script. A variable left out of
@@ -163,7 +162,9 @@ users and tokens) before regenerating.
 
 #### `MAX_HOME_COUNT` (`fleet.env.example`: 2, built-in default: 10)
 
-How many home slots the instance holds (indices `0..MAX_HOME_COUNT-1`).
+How many homes the instance holds at once (indices `0..MAX_HOME_COUNT-1`). Homes
+aren't pre-created: claiming one takes the lowest free index, releasing it
+frees the index again; a claim with every index taken gets a 409.
 
 ### Internal SSH tunnel ports
 

@@ -44,11 +44,7 @@ class SchemeProxyMappingPortTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='bob', password='pw')
         self.token = Token.objects.create(user=self.user)
-        # home_index 0 is already provisioned by migration 0003_provision_homes; claim it.
-        self.home = Home.objects.get(home_index=0)
-        self.home.user = self.user
-        self.home.public_key = 'ssh-ed25519 AAAA...'
-        self.home.slug = 'testslug'
+        self.home = Home(home_index=0, user=self.user, public_key='ssh-ed25519 AAAA...', slug='testslug')
         self.home.save()
         HomeBaseDomain.objects.create(home=self.home, domain='example.com')
         self.client = APIClient()
@@ -125,3 +121,66 @@ class SchemeProxyMappingPortTest(TestCase):
         )
         self.assertEqual(resp.status_code, 201)
         mock_exists.assert_called_once_with('https', 'example.com', base)
+
+
+@patch('core.services.ElevatedOperations.add_home_user')
+class HomeClaimTest(TestCase):
+    """Homes are created on claim at the lowest free home_index and deleted on
+    release -- there are no pre-provisioned empty rows."""
+
+    def client_for(self, username):
+        user = User.objects.create_user(username=username, password='pw')
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {Token.objects.create(user=user).key}')
+        return user, client
+
+    def claim(self, client):
+        return client.post('/api/homes/', {'public_key': 'ssh-ed25519 AAAA...'}, format='json')
+
+    def test_claims_get_consecutive_indices(self, mock_add_user):
+        alice, alice_client = self.client_for('alice')
+        _, bob_client = self.client_for('bob')
+
+        self.assertEqual(self.claim(alice_client).status_code, 201)
+        self.assertEqual(self.claim(bob_client).status_code, 201)
+
+        self.assertEqual(Home.objects.get(user=alice).home_index, 0)
+        self.assertEqual(sorted(Home.objects.values_list('home_index', flat=True)), [0, 1])
+        mock_add_user.assert_any_call(0, 'alice', 'ssh-ed25519 AAAA...')
+
+    @patch('core.services.ElevatedOperations.remove_home_user')
+    @patch('core.services.HAProxyService.get_home_mappings', return_value=[])
+    def test_released_index_is_reused(self, mock_get_mappings, mock_remove_user, mock_add_user):
+        alice, alice_client = self.client_for('alice')
+        _, bob_client = self.client_for('bob')
+        _, carol_client = self.client_for('carol')
+        self.claim(alice_client)
+        self.claim(bob_client)
+
+        slug = Home.objects.get(user=alice).slug
+        self.assertEqual(alice_client.delete(f'/api/homes/{slug}/').status_code, 204)
+        self.assertFalse(Home.objects.filter(home_index=0).exists())
+
+        self.assertEqual(self.claim(carol_client).status_code, 201)
+        self.assertEqual(Home.objects.get(user__username='carol').home_index, 0)
+
+    def test_full_fleet_returns_409(self, mock_add_user):
+        from core.ssh.manage_home import tunnel_manager
+        for i in range(tunnel_manager.config.MAX_HOME_COUNT):
+            Home.objects.create(home_index=i, user=User.objects.create_user(f'u{i}'), slug=f's{i}')
+        _, client = self.client_for('late')
+
+        resp = self.claim(client)
+
+        self.assertEqual(resp.status_code, 409)
+        mock_add_user.assert_not_called()
+
+    def test_failed_user_creation_leaves_no_row(self, mock_add_user):
+        import subprocess
+        mock_add_user.side_effect = subprocess.CalledProcessError(1, 'manage_home.py')
+        _, client = self.client_for('alice')
+
+        resp = self.claim(client)
+
+        self.assertEqual(resp.status_code, 500)
+        self.assertFalse(Home.objects.exists())

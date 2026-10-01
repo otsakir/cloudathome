@@ -8,15 +8,6 @@ from core.ssh.manage_home import tunnel_manager
 class HomeSerializer(serializers.Serializer):
     public_key = serializers.CharField(max_length=800, required=True)
 
-    def update(self, instance: Home, validated_data):
-        assert instance.user is None
-
-        instance.public_key = validated_data['public_key']
-        instance.user = validated_data.get('user')
-        instance.slug = validated_data.get('slug')
-        instance.save()
-
-
 
 class UpdateHomeKeySerializer(serializers.Serializer):
     public_key = serializers.CharField(max_length=800)

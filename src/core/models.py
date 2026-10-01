@@ -6,7 +6,7 @@ from core.ssh.manage_home import tunnel_manager
 
 
 class Home(models.Model):
-    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name='homes')
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='homes')
     home_index = models.IntegerField(
         primary_key=True,
         validators=[MinValueValidator(0), MaxValueValidator(tunnel_manager.config.MAX_HOME_COUNT - 1)],
@@ -20,7 +20,7 @@ class Home(models.Model):
 
     @property
     def get_username(self):
-        return tunnel_manager.make_username(home_index=self.home_index, suffix=self.user.username) if self.user else None
+        return tunnel_manager.make_username(home_index=self.home_index, suffix=self.user.username)
 
 
 class HomeBaseDomain(models.Model):

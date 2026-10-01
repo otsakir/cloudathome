@@ -10,7 +10,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            homes = list(Home.objects.filter(user__isnull=False))
+            homes = list(Home.objects.all())
         except (OperationalError, ProgrammingError):
             self.stdout.write('Database not ready, skipping bandwidth reconciliation')
             return

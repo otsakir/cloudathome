@@ -96,7 +96,7 @@ class DashboardTunnelPortsTests(TestCase):
         self.user = User.objects.create_user('alice', password='pw')
         self.user.groups.add(Group.objects.get(name='homeowner'))
         self.client.force_login(self.user)
-        Home.objects.filter(home_index=0).update(user=self.user, slug='s')
+        Home.objects.create(home_index=0, user=self.user, slug='s')
         self.config = tunnel_manager.config
         self.port_base = tunnel_manager.get_home_port_base(0)
         self.tcp_base = tunnel_manager.get_home_tcp_public_port_base(0)

@@ -1,5 +1,4 @@
 import sys
-import secrets
 import subprocess
 
 from django.conf import settings
@@ -13,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from core.models import HomeBaseDomain
-from core.services import ElevatedOperations, HAProxyService, BaseDomainService, release_home, DEFAULT_SCHEME_PORTS
+from core.services import ElevatedOperations, HAProxyService, BaseDomainService, claim_home, release_home, NoFreeHomeSlot, DEFAULT_SCHEME_PORTS
 from core.ssh.manage_home import tunnel_manager
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -165,18 +164,14 @@ class HomeListCreateAPIView(ListCreateAPIView):
         if Home.objects.filter(user=request.user).exists():
             return Response({'message': 'user already has a home'}, status=status.HTTP_409_CONFLICT)
 
-        available_home = Home.objects.filter(user__isnull=True).first()
-        if not available_home:
-            return Response({'message': 'no available home slots'}, status=status.HTTP_409_CONFLICT)
-
         try:
-            ElevatedOperations.add_home_user(available_home.home_index, request.user.username, s.validated_data['public_key'])
+            home = claim_home(request.user, s.validated_data['public_key'])
+        except NoFreeHomeSlot:
+            return Response({'message': 'no available home slots'}, status=status.HTTP_409_CONFLICT)
         except subprocess.CalledProcessError:
             return Response({'message': 'failed to create tunnel user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        HomeSerializer().update(available_home, {**s.validated_data, 'user': request.user, 'slug': secrets.token_urlsafe(16)})
-
-        return Response(OutHomeSerializer(available_home).data, status=status.HTTP_201_CREATED)
+        return Response(OutHomeSerializer(home).data, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(
@@ -547,7 +542,7 @@ class HomeSyncView(APIView):
         import pwd
         from core.services import ElevatedOperations as EO
 
-        homes = list(Home.objects.filter(user__isnull=False).select_related('user'))
+        homes = list(Home.objects.select_related('user'))
         reconciled = 0
         for home in homes:
             try:

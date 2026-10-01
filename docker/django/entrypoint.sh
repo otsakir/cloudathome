@@ -7,8 +7,7 @@ trap 'echo "Stopping Django and sshd..."; kill $(jobs -p); exit 0' SIGTERM
 # ensure the django user owns the var directory (bind mount arrives owned by the host user)
 chown -R django:django /opt/backend-var
 
-# first start only: create the schema and provision MAX_HOME_COUNT home slots
-# (core/migrations/0003_provision_homes.py) from the mounted fleet_config.json.
+# first start only: create the schema (homes are created on claim, not here).
 # Later schema upgrades are a manual `manage.py migrate`. Same "empty DB"
 # test ./setup uses to decide it may still run.
 if [ ! -s /opt/backend-var/db.sqlite3 ]; then

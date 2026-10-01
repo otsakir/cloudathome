@@ -10,7 +10,7 @@ This is the contract the home-side client (`cah.py` / Home Console) talks to —
 | POST | `/api/homes/` | Claim a home slot and install SSH key |
 | GET | `/api/homes/<slug>/` | Retrieve home details (port ranges, base domains, bandwidth limit) |
 | PATCH | `/api/homes/<slug>/` | Rotate SSH public key and/or set/clear bandwidth limit |
-| DELETE | `/api/homes/<slug>/` | Release a home slot (also removes its live HAProxy mappings, registered base domains, and bandwidth limit, so none of it carries over to whoever claims the slot next) |
+| DELETE | `/api/homes/<slug>/` | Release a home slot (removes its live HAProxy mappings and system user, then deletes the home along with its base domains and bandwidth limit, so none of it carries over to whoever claims that index next) |
 | GET | `/api/homes/<slug>/base-domains/` | List registered base domains |
 | POST | `/api/homes/<slug>/base-domains/` | Register a base domain |
 | DELETE | `/api/homes/<slug>/base-domains/<domain>/` | Remove a base domain (blocked if active proxy mappings exist under it) |

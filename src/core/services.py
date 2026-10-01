@@ -338,10 +338,58 @@ class ElevatedOperations:
         )
 
 
+class NoFreeHomeSlot(Exception):
+    """All MAX_HOME_COUNT home indices are taken."""
+
+
+def claim_home(user, public_key):
+    """Create a Home for `user` at the lowest free home_index and set up its
+    system tunnel user. Homes exist only while claimed -- release_home deletes
+    the row -- so MAX_HOME_COUNT is a cap, not a set of pre-made rows.
+
+    The row is inserted before the system user is created: home_index is the
+    primary key, so two concurrent claims racing for the same index fail the
+    insert (IntegrityError, retried at the next free index) instead of both
+    creating a Linux user for it.
+
+    Raises NoFreeHomeSlot if every index is taken, or
+    subprocess.CalledProcessError if creating the system user fails (the row
+    is removed again in that case).
+    """
+    import secrets
+    from django.db import IntegrityError, transaction
+    from core.models import Home
+    from core.ssh.manage_home import tunnel_manager
+
+    max_homes = tunnel_manager.config.MAX_HOME_COUNT
+    for _ in range(max_homes):
+        used = set(Home.objects.values_list('home_index', flat=True))
+        free = next((i for i in range(max_homes) if i not in used), None)
+        if free is None:
+            raise NoFreeHomeSlot()
+        try:
+            with transaction.atomic():
+                home = Home.objects.create(
+                    home_index=free, user=user, public_key=public_key, slug=secrets.token_urlsafe(16),
+                )
+            break
+        except IntegrityError:
+            continue
+    else:
+        raise NoFreeHomeSlot()
+
+    try:
+        ElevatedOperations.add_home_user(home.home_index, user.username, public_key)
+    except subprocess.CalledProcessError:
+        home.delete()
+        raise
+    return home
+
+
 def release_home(home):
-    """Fully release a home slot: tear down its live HAProxy mappings, remove the
-    system tunnel user, and clear all per-slot state (base domains, bandwidth
-    limit) so none of it carries over to whoever claims this slot next.
+    """Fully release a home: tear down its live HAProxy mappings, remove the
+    system tunnel user, and delete the Home row (its base domains cascade), so
+    nothing carries over to whoever claims this home_index next.
 
     Shared by the API's DELETE /api/homes/<slug>/ and the web UI's "Release home"
     button -- previously duplicated, which is how the web path silently missed
@@ -350,7 +398,6 @@ def release_home(home):
     Raises subprocess.CalledProcessError if removing the system user fails;
     callers should catch that specifically to report a clean error.
     """
-    from django.db import transaction
     from core.ssh.manage_home import tunnel_manager
 
     port_base = tunnel_manager.get_home_port_base(home.home_index)
@@ -369,10 +416,4 @@ def release_home(home):
 
     ElevatedOperations.remove_home_user(home.home_index, home.user.username)
 
-    with transaction.atomic():
-        home.base_domains.all().delete()
-        home.public_key = None
-        home.user = None
-        home.slug = None
-        home.bandwidth_limit_kbps = None
-        home.save()
+    home.delete()

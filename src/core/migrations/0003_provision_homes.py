@@ -1,16 +1,10 @@
 from django.db import migrations
 
-from core.ssh.manage_home import tunnel_manager
 
-
-def provision_homes(apps, schema_editor):
-    # Reads the live MAX_HOME_COUNT rather than a frozen literal: on a fresh install
-    # this provisions exactly as many Home slots as the deployment is configured for.
-    # On an already-migrated database this migration doesn't re-run, so raising
-    # MAX_HOME_COUNT later still needs a separate backfill step, not an edit here.
-    Home = apps.get_model('homes', 'Home')
-    for i in range(tunnel_manager.config.MAX_HOME_COUNT):
-        Home.objects.get_or_create(home_index=i)
+# Used to pre-create MAX_HOME_COUNT empty Home rows here. Homes are now created
+# on claim and deleted on release (core.services.claim_home/release_home), so
+# this is a no-op; 0010_dynamic_homes removes the empty rows older installs
+# still have. Kept because it's part of the migration graph.
 
 
 class Migration(migrations.Migration):
@@ -20,5 +14,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(provision_homes, migrations.RunPython.noop),
+        migrations.RunPython(migrations.RunPython.noop, migrations.RunPython.noop),
     ]
