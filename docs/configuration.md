@@ -99,7 +99,8 @@ A shared range of extra public ports for HTTP/HTTPS mappings, in `base-max`
 form (inclusive). Unlike raw TCP ports, the range is **not** split per home:
 any home may use any port in it, because HTTP/HTTPS traffic is routed by
 hostname (plus port), and hostnames can't collide across homes. Homes discover
-the range via `GET /api/config/inbound-ports/<scheme>/` and request a port with
+the range (along with the scheme's default port, `HTTP_INBOUND_DEFAULT_PORT`/
+`HTTPS_INBOUND_DEFAULT_PORT`) via `GET /api/config/inbound-ports/<scheme>/` and request a port with
 `public_port` when creating a mapping.
 
 The range is used in two places:

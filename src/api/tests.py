@@ -21,13 +21,26 @@ class InboundPortRangeViewTest(TestCase):
         resp = self.client.get('/api/config/inbound-ports/http/')
         self.assertEqual(resp.status_code, 200)
         base, count = settings.HTTP_INBOUND_PORT_RANGE
-        self.assertEqual(resp.json(), {'scheme': 'http', 'ranges': [{'port_base': base, 'port_count': count}]})
+        self.assertEqual(resp.json(), {
+            'scheme': 'http',
+            'default_port': settings.HTTP_INBOUND_DEFAULT_PORT,
+            'ranges': [{'port_base': base, 'port_count': count}],
+        })
 
     def test_https_range(self):
         resp = self.client.get('/api/config/inbound-ports/https/')
         self.assertEqual(resp.status_code, 200)
         base, count = settings.HTTPS_INBOUND_PORT_RANGE
-        self.assertEqual(resp.json(), {'scheme': 'https', 'ranges': [{'port_base': base, 'port_count': count}]})
+        self.assertEqual(resp.json(), {
+            'scheme': 'https',
+            'default_port': settings.HTTPS_INBOUND_DEFAULT_PORT,
+            'ranges': [{'port_base': base, 'port_count': count}],
+        })
+
+    @patch.dict('api.views.DEFAULT_SCHEME_PORTS', {'http': 8000, 'https': 8443})
+    def test_default_port_reflects_operator_override(self):
+        self.assertEqual(self.client.get('/api/config/inbound-ports/http/').json()['default_port'], 8000)
+        self.assertEqual(self.client.get('/api/config/inbound-ports/https/').json()['default_port'], 8443)
 
     def test_unknown_scheme_404s(self):
         resp = self.client.get('/api/config/inbound-ports/tcp/')

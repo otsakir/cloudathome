@@ -19,7 +19,7 @@ This is the contract the home-side client (`cah.py` / Home Console) talks to —
 | DELETE | `/api/homes/<slug>/proxy-mappings/<scheme>/<host>/<port>/` | Remove an HTTP/HTTPS forwarding rule from HAProxy (port is required since a hostname may have mappings at more than one) |
 | POST | `/api/homes/<slug>/proxy-mappings/tcp/` | Allocate a tunnel port and register a raw TCP mapping (public port must be in this home's TCP port range) |
 | DELETE | `/api/homes/<slug>/proxy-mappings/tcp/<port>/` | Remove a TCP forwarding rule from HAProxy |
-| GET | `/api/config/inbound-ports/<scheme>/` | Get the shared, system-wide inbound port range for HTTP/HTTPS mappings |
+| GET | `/api/config/inbound-ports/<scheme>/` | Get the shared, system-wide inbound port range for HTTP/HTTPS mappings, plus the scheme's `default_port` |
 
 ### Auth
 

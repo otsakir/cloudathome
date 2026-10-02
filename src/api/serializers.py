@@ -57,6 +57,9 @@ class PortRangeSerializer(serializers.Serializer):
 
 class InboundPortRangeSerializer(serializers.Serializer):
     scheme = serializers.ChoiceField(choices=['http', 'https'])
+    default_port = serializers.IntegerField(
+        help_text='Standard port this instance always offers for the scheme (used when public_port is omitted)'
+    )
     ranges = PortRangeSerializer(many=True)
 
 

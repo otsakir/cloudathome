@@ -426,8 +426,9 @@ class ProxyInstanceAPIView(APIView):
     summary='Get the supported inbound port range for a scheme',
     description=(
         'Returns the shared, system-wide port range available for HTTP or HTTPS proxy mappings, '
-        'in addition to the always-available standard port for this instance (80 for HTTP, 443 for HTTPS, '
-        'by default -- operator-configurable). '
+        'in addition to the always-available standard port for this instance, returned as `default_port` '
+        '(80 for HTTP, 443 for HTTPS by default -- operator-configurable via '
+        'HTTP_INBOUND_DEFAULT_PORT/HTTPS_INBOUND_DEFAULT_PORT). '
         'Unlike TCP forwarding, this range is not split per home -- any home may request a mapping '
         'on any port in it, since HTTP/HTTPS mappings are routed by hostname, not port alone.'
     ),
@@ -449,7 +450,7 @@ class InboundPortRangeView(APIView):
         if scheme not in self.RANGES:
             return Response(status=status.HTTP_404_NOT_FOUND)
         ranges = [{'port_base': base, 'port_count': count} for base, count in self.RANGES[scheme]]
-        return Response({'scheme': scheme, 'ranges': ranges})
+        return Response({'scheme': scheme, 'default_port': DEFAULT_SCHEME_PORTS[scheme], 'ranges': ranges})
 
 
 class ProxyMappingDumpView(APIView):
