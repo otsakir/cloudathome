@@ -13,7 +13,7 @@ from core.models import Home
 from core.services import ElevatedOperations, HAProxyService, release_home
 from core.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, UpdatePublicKeyForm
-from web.services import HomeConfigService, cloudserver_url, ssh_host
+from web.services import HomeConfigService, cloudserver_url, ssh_host, ssh_host_key_fingerprints
 
 
 class HomeOwnerMixin(LoginRequiredMixin):
@@ -72,6 +72,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context['cloudserver_url'] = cloudserver_url(self.request)
         context['ssh_host'] = ssh_host(self.request)
         context['ssh_port'] = settings.CAH_SSH_PORT
+        context['ssh_host_keys'] = ssh_host_key_fingerprints()
         if home:
             port_base = tunnel_manager.get_home_port_base(home.home_index)
             port_count = tunnel_manager.config.TUNNEL_PORTS_PER_HOME

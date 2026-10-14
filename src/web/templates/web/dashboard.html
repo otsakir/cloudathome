@@ -10,6 +10,7 @@
 <table>
   <tr><th>Cloud server URL</th><td><code>{{ cloudserver_url }}</code></td></tr>
   {% if home %}<tr><th>SSH endpoint</th><td><code>{{ ssh_host }}:{{ ssh_port }}</code></td></tr>{% endif %}
+  {% if home and ssh_host_keys %}<tr><th>SSH host key fingerprints</th><td>{% for key_type, fp in ssh_host_keys %}{{ key_type }} <code>{{ fp }}</code>{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endif %}
 </table>
 
 <h2>Your home</h2>

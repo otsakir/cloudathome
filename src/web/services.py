@@ -1,3 +1,7 @@
+import base64
+import hashlib
+from pathlib import Path
+
 import yaml
 from django.conf import settings
 from rest_framework.authtoken.models import Token
@@ -34,6 +38,25 @@ def cloudserver_url(request):
 def ssh_host(request):
     """Host homes open their SSH tunnel to -- same host as cloudserver_url()."""
     return settings.CAH_HOSTNAME or request.get_host().split(':')[0]
+
+
+_SSH_KEY_TYPE_LABELS = {'ssh-ed25519': 'ED25519', 'ssh-rsa': 'RSA'}
+
+
+def ssh_host_key_fingerprints():
+    """[(key_type, 'SHA256:...'), ...] for sshd's host keys, in the format ssh
+    prints them -- so a home whose tunnels report a changed host key can check
+    the new one against this before trusting it."""
+    result = []
+    for path in sorted(Path(settings.CAH_SSH_HOST_KEY_DIR).glob('ssh_host_*_key.pub')):
+        try:
+            key_type, blob = path.read_text().split()[:2]
+            digest = hashlib.sha256(base64.b64decode(blob)).digest()
+        except (OSError, ValueError):
+            continue
+        label = _SSH_KEY_TYPE_LABELS.get(key_type) or ('ECDSA' if key_type.startswith('ecdsa-') else key_type)
+        result.append((label, 'SHA256:' + base64.b64encode(digest).decode().rstrip('=')))
+    return result
 
 
 class HomeConfigService:

@@ -152,6 +152,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CAH_PUBLIC_KEY_STORAGE_PATH = '/var/tunnelagent/public_keys'
 CAH_SSH_PORT = int(os.environ.get('CAH_SSH_PORT', '8022'))
+# Where sshd's host public keys (ssh_host_*_key.pub) live -- their fingerprints
+# are shown on the dashboard so homes can verify a changed host key.
+CAH_SSH_HOST_KEY_DIR = os.environ.get('CAH_SSH_HOST_KEY_DIR', '/etc/ssh')
 
 HAPROXY_ENABLED = False
 HAPROXY_API_HOST = 'localhost'

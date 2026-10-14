@@ -124,3 +124,16 @@ class DashboardTunnelPortsTests(TestCase):
     def test_shows_zero_usage_without_breakdown(self):
         response = self.get_dashboard([])
         self.assertContains(response, f'(0 of {self.config.TUNNEL_PORTS_PER_HOME} in use)')
+
+    def test_shows_ssh_host_key_fingerprints(self):
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as key_dir:
+            key = f'{key_dir}/ssh_host_ed25519_key'
+            subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', key], check=True)
+            expected = subprocess.run(['ssh-keygen', '-l', '-f', f'{key}.pub'],
+                                      capture_output=True, text=True, check=True).stdout.split()[1]
+            with self.settings(CAH_SSH_HOST_KEY_DIR=key_dir):
+                response = self.get_dashboard([])
+        self.assertEqual(response.context['ssh_host_keys'], [('ED25519', expected)])
+        self.assertContains(response, expected)
