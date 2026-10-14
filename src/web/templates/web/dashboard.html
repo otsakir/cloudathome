@@ -33,7 +33,7 @@
   {% if mappings %}
     <table>
       <thead>
-        <tr><th>Hostname</th><th>Tunnel port</th><th>Scheme</th></tr>
+        <tr><th>Hostname</th><th>Tunnel port</th><th>Scheme</th><th>Tunnel</th></tr>
       </thead>
       <tbody>
         {% for mapping in mappings %}
@@ -41,6 +41,7 @@
             <td>{{ mapping.host }}</td>
             <td>{{ mapping.tunnel_port }}</td>
             <td>{{ mapping.scheme }}</td>
+            <td>{% if mapping.tunnel_up %}up{% else %}down{% endif %}</td>
           </tr>
         {% endfor %}
       </tbody>

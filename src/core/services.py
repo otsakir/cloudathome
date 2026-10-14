@@ -34,6 +34,30 @@ TLS_KEY_FILE = '/etc/cloudathome/certs/privkey.pem'
 # HTTPS_INBOUND_DEFAULT_PORT in local_settings.py for why these are separate.
 DEFAULT_SCHEME_PORTS = {'http': settings.HTTP_INBOUND_DEFAULT_PORT, 'https': settings.HTTPS_INBOUND_DEFAULT_PORT}
 
+PROC_NET_TCP_FILES = ('/proc/net/tcp', '/proc/net/tcp6')
+TCP_LISTEN_STATE = '0A'
+
+
+def get_listening_ports():
+    """Return the set of TCP ports something is listening on in this network namespace.
+
+    sshd runs in the same container as Django, so a home's reverse tunnel is up
+    exactly when sshd is listening on its tunnel port here. Reads /proc
+    directly: world-readable, so no sudo is needed.
+    """
+    ports = set()
+    for path in PROC_NET_TCP_FILES:
+        try:
+            with open(path) as f:
+                next(f)  # header
+                for line in f:
+                    fields = line.split()
+                    if len(fields) > 3 and fields[3] == TCP_LISTEN_STATE:
+                        ports.add(int(fields[1].rsplit(':', 1)[1], 16))
+        except OSError:
+            continue
+    return ports
+
 
 class HAProxyService:
 

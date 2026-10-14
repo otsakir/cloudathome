@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.views.generic import FormView, TemplateView, View
 
 from core.models import Home
-from core.services import ElevatedOperations, HAProxyService, release_home
+from core.services import ElevatedOperations, HAProxyService, get_listening_ports, release_home
 from core.ssh.manage_home import tunnel_manager
 from web.forms import SignupForm, UpdatePublicKeyForm
 from web.services import HomeConfigService, cloudserver_url, ssh_host, ssh_host_key_fingerprints
@@ -84,6 +84,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
             tcp_ports = {m['tunnel_port'] for m in mappings if m['scheme'] == 'tcp'}
             http_ports = {m['tunnel_port'] for m in mappings if m['scheme'] != 'tcp'}
+            listening = get_listening_ports()
+            for mapping in mappings:
+                mapping['tunnel_up'] = mapping['tunnel_port'] in listening
             context['mappings'] = mappings
             context['tunnel_port_first'] = port_base
             context['tunnel_port_last'] = port_base + port_count - 1

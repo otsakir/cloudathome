@@ -282,3 +282,26 @@ class ReconcileAdminRouteCommandTest(TestCase):
         self.assertIn('Django HTTP:  enabled at http://cloud.example.com/', output)
         self.assertNotIn('redirects to HTTPS', output)
         self.assertIn('Django HTTPS: disabled -- no cert found at', output)
+
+
+class GetListeningPortsTests(SimpleTestCase):
+    def test_parses_only_listen_sockets_from_ipv4_and_ipv6(self):
+        import tempfile
+        from core import services
+        header = '  sl  local_address rem_address   st tx_queue rx_queue\n'
+        tcp4 = header + (
+            '   0: 00000000:07D0 00000000:0000 0A 00000000:00000000\n'   # 2000 LISTEN
+            '   1: 0100007F:07D1 0100007F:A1B2 01 00000000:00000000\n'   # 2001 ESTABLISHED
+        )
+        tcp6 = header + (
+            '   0: 00000000000000000000000000000000:07D2 00000000000000000000000000000000:0000 0A 00000000:00000000\n'
+        )
+        with tempfile.TemporaryDirectory() as d:
+            paths = []
+            for name, content in (('tcp', tcp4), ('tcp6', tcp6)):
+                path = f'{d}/{name}'
+                with open(path, 'w') as f:
+                    f.write(content)
+                paths.append(path)
+            with patch.object(services, 'PROC_NET_TCP_FILES', (*paths, f'{d}/missing')):
+                self.assertEqual(services.get_listening_ports(), {2000, 2002})

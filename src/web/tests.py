@@ -125,6 +125,20 @@ class DashboardTunnelPortsTests(TestCase):
         response = self.get_dashboard([])
         self.assertContains(response, f'(0 of {self.config.TUNNEL_PORTS_PER_HOME} in use)')
 
+    def test_shows_tunnel_up_or_down_per_mapping(self):
+        from unittest.mock import patch
+        b = self.port_base
+        entries = [
+            {'host': 'up.example.com', 'public_port': 443, 'backend': f'tunnel_{b}', 'scheme': 'https'},
+            {'host': 'down.example.com', 'public_port': 443, 'backend': f'tunnel_{b + 1}', 'scheme': 'https'},
+        ]
+        with patch('web.views.get_listening_ports', return_value={b}):
+            response = self.get_dashboard(entries)
+        mappings = {m['host']: m['tunnel_up'] for m in response.context['mappings']}
+        self.assertEqual(mappings, {'up.example.com': True, 'down.example.com': False})
+        self.assertContains(response, '<td>up</td>', html=True)
+        self.assertContains(response, '<td>down</td>', html=True)
+
     def test_shows_ssh_host_key_fingerprints(self):
         import subprocess
         import tempfile
