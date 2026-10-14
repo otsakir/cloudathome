@@ -15,6 +15,20 @@ if [ ! -s /opt/backend-var/db.sqlite3 ]; then
   su-exec django python /opt/app/manage.py migrate --noinput
 fi
 
+# sshd host keys: generated on first start only, into the host_keys bind mount
+# (compose.yaml), so the cloud keeps the same SSH identity across image
+# rebuilds -- homes pin it and refuse to connect once it changes. Public keys
+# stay world-readable: the dashboard shows their fingerprints.
+chown root:root /etc/ssh/host_keys
+chmod 755 /etc/ssh/host_keys
+for t in ed25519 ecdsa rsa; do
+  key=/etc/ssh/host_keys/ssh_host_${t}_key
+  if [ ! -f "$key" ]; then
+    echo "Generating SSH host key $key"
+    ssh-keygen -q -t "$t" -N '' -f "$key"
+  fi
+done
+
 # sshd must start first — reconcile_tunnel_users sends SIGHUP to reload its config
 /usr/sbin/sshd
 

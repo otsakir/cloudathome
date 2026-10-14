@@ -2,9 +2,12 @@ FROM python:3.12-alpine
 
 
 # install os system packages
+# No `ssh-keygen -A` here: host keys baked into the image would change on
+# every rebuild, and every home would then refuse to connect (host key
+# changed). entrypoint.sh generates them once into /etc/ssh/host_keys, a bind
+# mount (compose.yaml), so they persist across rebuilds.
 RUN apk add --no-cache openssh bash su-exec sudo iproute2 iptables && \
-    mkdir -p /var/run/sshd && \
-    ssh-keygen -A
+    mkdir -p /var/run/sshd /etc/ssh/host_keys
 
 # Create admin ssh user
 RUN adduser -D admin && echo "admin:*" | chpasswd -e && cd /home/admin && \
@@ -57,6 +60,7 @@ RUN echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
     echo "GatewayPorts yes" > /etc/ssh/sshd_config.d/00-prologue.conf && \
     echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config.d/00-prologue.conf && \
+    for t in ed25519 ecdsa rsa; do echo "HostKey /etc/ssh/host_keys/ssh_host_${t}_key" >> /etc/ssh/sshd_config.d/00-prologue.conf; done && \
     echo "AllowUsers admin" > /etc/ssh/sshd_config.d/01-allowed_users.conf
 
 # Expose SSH port

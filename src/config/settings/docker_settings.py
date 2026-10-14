@@ -20,6 +20,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = '/opt/static'
 
 HAPROXY_ENABLED = True
+CAH_SSH_HOST_KEY_DIR = '/etc/ssh/host_keys'  # see compose.yaml's host_keys bind mount
 HAPROXY_API_HOST = 'haproxy'
 # HAPROXY_API_PORT is inherited from local_settings (env-var driven, same value).
 

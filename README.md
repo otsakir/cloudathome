@@ -98,6 +98,14 @@ docker compose -f compose.yaml exec -u django tunnelagent python /opt/app/manage
 
 The SQLite database is stored outside the container at `src/var/db.sqlite3`.
 
+The SSH server's host keys are likewise kept outside the container, in
+`docker/django/ssh/` (generated on the first start). Homes pin the cloud's host
+key and refuse to connect once it changes, so keeping it out of the image means
+rebuilds don't break every home's tunnels. To deliberately rotate it, delete
+those files and restart `tunnelagent`. Each home must then accept the new key
+(`cah.py reset-host-key`, or the Home Console's dashboard); the cloud dashboard
+shows the current fingerprints so they can check it first.
+
 ### Create an admin user 
 
 Having started the system, create the superuser as normally done in a django installation. 

@@ -67,6 +67,10 @@ services:
       # with (fullchain.pem/privkey.pem) -- no ACME automation, drop files here
       # manually. Only reachable via HAProxy, never published directly.
       - ./docker/django/certs:/etc/cloudathome/certs:ro
+      # sshd's host keys, generated on first start (entrypoint.sh). Kept outside
+      # the image so rebuilds don't change the cloud's SSH identity, which homes
+      # pin. Delete the files to deliberately rotate it.
+      - ./docker/django/ssh:/etc/ssh/host_keys
       # Fleet-size config locked at install time by ./setup.
       # Read-only, so nothing inside the container (not even root -- no
       # CAP_SYS_ADMIN to remount) can change what manage_home.py trusts.
