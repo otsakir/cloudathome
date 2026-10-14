@@ -55,11 +55,16 @@ RUN chmod 440 /etc/sudoers.d/tunneling
 
 
 WORKDIR /
-# Secure SSH
+# Secure SSH. ClientAlive*: drop a home's session ~45s after it vanishes
+# without closing it (e.g. its internet went down) -- otherwise sshd holds the
+# session, and the -R tunnel port it listens on, for up to ~2h (TCP keepalive),
+# and the home's reconnect is refused ("remote port forwarding failed").
 RUN echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
     echo "GatewayPorts yes" > /etc/ssh/sshd_config.d/00-prologue.conf && \
     echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config.d/00-prologue.conf && \
+    echo "ClientAliveInterval 15" >> /etc/ssh/sshd_config.d/00-prologue.conf && \
+    echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config.d/00-prologue.conf && \
     for t in ed25519 ecdsa rsa; do echo "HostKey /etc/ssh/host_keys/ssh_host_${t}_key" >> /etc/ssh/sshd_config.d/00-prologue.conf; done && \
     echo "AllowUsers admin" > /etc/ssh/sshd_config.d/01-allowed_users.conf
 
